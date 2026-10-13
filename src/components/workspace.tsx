@@ -18,6 +18,16 @@ import {
 } from "lucide-react";
 import { toPng } from "html-to-image";
 import PlayerCsvImport from "@/components/player-csv-import";
+import PosterPreview from "@/components/poster-preview";
+import WeeklyPoster from "@/components/weekly-poster";
+import SummaryEntry from "@/components/summary-entry";
+import {
+  emptySummary,
+  summaryValid,
+  categories,
+  categoryStandings,
+  type Summary,
+} from "@/lib/result-summary";
 import ManualGameEntry from "@/components/manual-game-entry";
 import { gameComplete } from "@/lib/manual-entry";
 import { supabase } from "@/lib/supabase";
@@ -30,8 +40,8 @@ type Screen =
   | "Fixtures"
   | "Add Result"
   | "Tables"
-  | "Stats"
-  | "Archive"
+  | "Teams & players"
+  | "Results"
   | "Weekly Overview"
   | "More";
 type Fixture = {
@@ -117,12 +127,9 @@ function Table({
           <thead>
             <tr>
               <th>Team</th>
-              <th>P</th>
-              <th>W</th>
-              <th>D</th>
-              <th>L</th>
-              <th>For</th>
-              <th>Against</th>
+              <th>Played</th>
+              {competition === "cup" && <th>Won</th>}
+              <th>Lost</th>
               {competition === "league" && <th>Points</th>}
             </tr>
           </thead>
@@ -131,10 +138,7 @@ function Table({
               <tr key={r.team}>
                 <td style={{ fontWeight: 600 }}>{r.team}</td>
                 <td>{r.played}</td>
-                <td>{r.won}</td>
-                <td>{r.drawn}</td>
-                <td>{r.lost}</td>
-                <td>{r.gamesFor}</td>
+                {competition === "cup" && <td>{r.gamesFor}</td>}
                 <td>{r.gamesAgainst}</td>
                 {competition === "league" && (
                   <td style={{ color: "var(--pink)", fontWeight: 700 }}>
@@ -152,9 +156,11 @@ function Table({
         </div>
       )}
       <p className="muted" style={{ fontSize: 11 }}>
-        Alphabetical display ·{" "}
         {competition === "league"
-          ? "Points = games won. Ranking and tie-break rules await confirmation."
+          ? "Most points first · Equal points are tied · "
+          : "Alphabetical display · "}{" "}
+        {competition === "league"
+          ? "Points = Pairs + Trebles + Singles + Captains & vice."
           : "Game totals only. Cup points and ranking await confirmation."}
       </p>
     </>
@@ -174,6 +180,8 @@ export default function Workspace() {
   const [teams, setTeams] = useState<Option[]>([]);
   const [players, setPlayers] = useState<Option[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
+  const loadSequence = useRef(0);
+  const [loadedScope, setLoadedScope] = useState("");
   const [stats, setStats] = useState<Stat[]>([]);
   const [season, setSeason] = useState("2026/27");
   const [competition, setCompetition] = useState<"league" | "cup">("league");
@@ -184,6 +192,9 @@ export default function Workspace() {
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
+  const [summary, setSummary] = useState<Summary>(emptySummary(false));
+  const [summaryReady, setSummaryReady] = useState(demo);
+  const [detailed, setDetailed] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
   const [review, setReview] = useState(false);
   const [archivePreview, setArchivePreview] = useState("");
@@ -194,13 +205,14 @@ export default function Workspace() {
     { name: "Fixtures", icon: CalendarDays },
     { name: "Add Result", icon: Plus },
     { name: "Tables", icon: Trophy },
-    { name: "Stats", icon: BarChart3 },
-    { name: "Archive", icon: ImageIcon },
+
+    { name: "Results", icon: ImageIcon },
     { name: "Weekly Overview", icon: Download },
   ];
   const selected = fixtures.find((f) => f.id === fixtureId);
   async function load() {
     if (!client) return;
+    const request = ++loadSequence.current;
     const responses = await Promise.all([
       client.from("seasons").select("id,name"),
       client.from("teams").select("id,name"),
@@ -209,11 +221,15 @@ export default function Workspace() {
       client.from("results").select("*, games(*,game_players(*))"),
       client.from("result_sheets").select("*"),
     ]);
+    if (request !== loadSequence.current) return;
     const failure = responses.find((r) => r.error);
     if (failure?.error) {
       setMessage(failure.error.message);
       return;
     }
+    const capability = await client.from("results").select("summary").limit(0);
+    if (request !== loadSequence.current) return;
+    setSummaryReady(!capability.error);
     const ss = responses[0].data ?? [];
     const ts = responses[1].data ?? [];
     const ps = responses[2].data ?? [];
@@ -242,12 +258,33 @@ export default function Workspace() {
           date: f?.date ?? "",
           home: f?.home ?? "",
           away: f?.away ?? "",
-          homeWins: r.games.filter(
-            (g: { winner: string }) => g.winner === "home",
-          ).length,
-          awayWins: r.games.filter(
-            (g: { winner: string }) => g.winner === "away",
-          ).length,
+          summary: r.summary,
+          fixtureId: r.fixture_id,
+          breakdown:
+            r.summary?.counts ??
+            Object.fromEntries(
+              categories(f?.competition === "cup").map(([kind]) => [
+                kind,
+                r.games.filter(
+                  (g: Game) => g.kind === kind && g.winner === "home",
+                ).length,
+              ]),
+            ),
+          homeWins: r.summary
+            ? Object.values(r.summary.counts as Record<string, number>).reduce(
+                (a, b) => a + b,
+                0,
+              )
+            : r.games.filter((g: { winner: string }) => g.winner === "home")
+                .length,
+          awayWins: r.summary
+            ? 12 -
+              Object.values(r.summary.counts as Record<string, number>).reduce(
+                (a, b) => a + b,
+                0,
+              )
+            : r.games.filter((g: { winner: string }) => g.winner === "away")
+                .length,
           approved: r.status === "approved",
         };
       }),
@@ -263,22 +300,24 @@ export default function Workspace() {
         f.date > week
       )
         continue;
-      for (const g of r.games)
-        for (const p of g.game_players) {
-          const row = totals.get(p.player_id) ?? {
-            name:
-              ps.find((x) => x.id === p.player_id)?.name ?? "Unknown player",
-            d1: 0,
-            score: 0,
-            checkout: 0,
-          };
-          row.d1 += p.double_ones;
-          row.score = Math.max(row.score, p.highest_score ?? 0);
-          row.checkout = Math.max(row.checkout, p.highest_checkout ?? 0);
-          totals.set(p.player_id, row);
-        }
+      for (const p of r.summary?.achievements ??
+        r.games.flatMap(
+          (g: { game_players: PlayerEntry[] }) => g.game_players,
+        )) {
+        const row = totals.get(p.player_id) ?? {
+          name: ps.find((x) => x.id === p.player_id)?.name ?? "Unknown player",
+          d1: 0,
+          score: 0,
+          checkout: 0,
+        };
+        row.d1 += p.double_ones;
+        row.score = Math.max(row.score, p.highest_score ?? 0);
+        row.checkout = Math.max(row.checkout, p.highest_checkout ?? 0);
+        totals.set(p.player_id, row);
+      }
     }
     setStats([...totals.values()]);
+    setLoadedScope([season, competition, week].join(":"));
   }
   useEffect(() => {
     if ("serviceWorker" in navigator)
@@ -347,6 +386,10 @@ export default function Workspace() {
   }
   function chooseFixture(id: string) {
     setFixtureId(id);
+    setDetailed(false);
+    setSummary(
+      emptySummary(fixtures.find((f) => f.id === id)?.competition === "cup"),
+    );
     setFile(null);
     setSheetId(null);
     setReview(false);
@@ -400,7 +443,7 @@ export default function Workspace() {
         );
       setSheetId(row.data.id);
       setMessage(
-        "Original photograph securely archived. Select the players and winners below, then review.",
+        "Original photograph saved. Enter the totals and any player achievements, then review.",
       );
       await load();
     } catch (e) {
@@ -413,12 +456,17 @@ export default function Workspace() {
     if (!client || !selected) return;
     setBusy(true);
     try {
-      const { error } = await client.rpc("save_result", {
-        p_fixture: selected.id,
-        p_sheet: sheetId,
-        p_games: games,
-        p_approve: true,
-      });
+      const { error } = await client.rpc(
+        detailed ? "save_result" : "save_summary_result",
+        detailed
+          ? {
+              p_fixture: selected.id,
+              p_sheet: sheetId,
+              p_games: games,
+              p_approve: true,
+            }
+          : { p_fixture: selected.id, p_sheet: sheetId, p_summary: summary },
+      );
       if (error) throw error;
       setMessage("Result approved. Tables and statistics have been refreshed.");
       setReview(false);
@@ -436,7 +484,7 @@ export default function Workspace() {
     const r = await client
       .from("results")
       .select(
-        "fixture_id,sheet_id,games(number,kind,winner,game_players(player_id,side,double_ones,highest_score,highest_checkout))",
+        "*,games(number,kind,winner,game_players(player_id,side,double_ones,highest_score,highest_checkout))",
       )
       .eq("id", id)
       .single();
@@ -447,10 +495,12 @@ export default function Workspace() {
     }
     chooseFixture(r.data.fixture_id);
     setSheetId(r.data.sheet_id);
+    setDetailed(!r.data.summary);
+    if (r.data.summary) setSummary(r.data.summary);
     setGames(
       r.data.games
-        .sort((a, b) => a.number - b.number)
-        .map((g) => ({
+        .sort((a: Game, b: Game) => a.number - b.number)
+        .map((g: Game & { game_players: PlayerEntry[] }) => ({
           number: g.number,
           kind: g.kind,
           winner: g.winner,
@@ -494,13 +544,6 @@ export default function Workspace() {
     );
   }
   const scoped = results.filter((r) => r.season === season && r.approved);
-  const upcoming = fixtures
-    .filter(
-      (f) =>
-        (demo || f.season === season) &&
-        f.date >= new Date().toISOString().slice(0, 10),
-    )
-    .sort((a, b) => a.date.localeCompare(b.date));
   const incomplete = fixtures.filter(
     (f) =>
       (demo || f.season === season) &&
@@ -514,7 +557,9 @@ export default function Workspace() {
           r.away === f.away,
       ),
   );
-  const formComplete = games.length === 12 && games.every(gameComplete);
+  const formComplete = detailed
+    ? games.length === 12 && games.every(gameComplete)
+    : summaryValid(summary, selected?.competition === "cup");
   const navigate = (name: Screen) => {
     setScreen(name);
     setMessage("");
@@ -583,16 +628,21 @@ export default function Workspace() {
         </div>
       </main>
     );
+  const statsReady =
+    demo || loadedScope === [season, competition, week].join(":");
   const statPanel = (key: "d1" | "checkout" | "score", title: string) => (
     <div className="card">
       <div className="card-head">
         <h2>{title}</h2>
         <Target size={19} color="#be426d" />
       </div>
-      {stats.length ? (
+      {!statsReady ? (
+        <p className="muted">Loading statistics…</p>
+      ) : stats.some((s) => s[key] > 0) ? (
         [...stats]
-          .sort((a, b) => b[key] - a[key])
-          .slice(0, 5)
+          .filter((s) => s[key] > 0)
+          .sort((a, b) => b[key] - a[key] || a.name.localeCompare(b.name))
+
           .map((s) => (
             <div className="result-row" key={s.name}>
               <span>{s.name}</span>
@@ -670,9 +720,9 @@ export default function Workspace() {
             <h1>{screen === "Home" ? "Welcome to your league" : screen}</h1>
             <p className="muted" style={{ margin: 0 }}>
               {screen === "Home"
-                ? "A little competition. A lot of community."
+                ? "Chelmsford City Ladies Darts League"
                 : screen === "Add Result"
-                  ? "Upload the original, enter the games, then check and approve."
+                  ? "Add the photo, enter the totals and check your result."
                   : "Chelmsford City Ladies Darts League · " + season}
             </p>
           </div>
@@ -703,7 +753,9 @@ export default function Workspace() {
                 ))}
               </select>
             </label>
-            {["Tables", "Stats", "Archive", "Fixtures"].includes(screen) && (
+            {["Tables", "Results", "Fixtures", "Weekly Overview"].includes(
+              screen,
+            ) && (
               <label>
                 Competition
                 <select
@@ -721,22 +773,6 @@ export default function Workspace() {
         )}
         {screen === "Home" && (
           <>
-            <div className="summary">
-              {[
-                [CalendarDays, "Upcoming fixtures", upcoming.length],
-                [Trophy, "Approved results", scoped.length],
-                [ImageIcon, "Archived sheets", sheets.length],
-              ].map(([Icon, label, value]) => {
-                const I = Icon as typeof Home;
-                return (
-                  <div className="card" key={String(label)}>
-                    <I size={20} color="#be426d" />
-                    <div className="metric">{String(value)}</div>
-                    <div className="muted">{String(label)}</div>
-                  </div>
-                );
-              })}
-            </div>
             <div className="grid">
               <div>
                 <div className="card">
@@ -796,30 +832,6 @@ export default function Workspace() {
                 </div>
               </div>
               <div>
-                <div className="card">
-                  <div className="card-head">
-                    <h2>Next at the oche</h2>
-                    <CalendarDays size={19} color="#be426d" />
-                  </div>
-                  {upcoming.length ? (
-                    upcoming.slice(0, 3).map((f) => (
-                      <div key={f.id} className="result-row">
-                        <div>
-                          <span className="eyebrow">{dateLabel(f.date)}</span>
-                          <h3>
-                            {f.home} <span className="muted">vs</span> {f.away}
-                          </h3>
-                          <span className="badge">{f.competition}</span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="empty">
-                      No upcoming fixtures. Add the season schedule to get
-                      started.
-                    </div>
-                  )}
-                </div>
                 {statPanel("d1", "Most Double 1s")}
                 <div className="card" style={{ background: "#fae8ef" }}>
                   <span className="eyebrow">Share the week</span>
@@ -844,7 +856,11 @@ export default function Workspace() {
         {screen === "Tables" && (
           <div className="card">
             <div className="card-head">
-              <h2>{competition === "league" ? "League" : "Cup"} standings</h2>
+              <h2>
+                {competition === "league"
+                  ? "The Gail Wander Trophy"
+                  : "Cup standings"}
+              </h2>
               <button
                 className="secondary"
                 disabled={!scoped.length}
@@ -866,8 +882,16 @@ export default function Workspace() {
             />
           </div>
         )}
-        {screen === "Stats" && (
+        {screen === "Tables" && (
           <>
+            <label style={{ maxWidth: 300 }}>
+              Results through
+              <input
+                type="date"
+                value={week}
+                onChange={(e) => setWeek(e.target.value)}
+              />
+            </label>
             <p className="muted">
               Approved {competition} results only · through {dateLabel(week)}
             </p>
@@ -876,9 +900,31 @@ export default function Workspace() {
               {statPanel("checkout", "Highest checkout")}
               {statPanel("score", "Highest score")}
             </div>
+            {competition === "league" && (
+              <div className="grid">
+                {categories(false).map(([kind]) => (
+                  <div className="card" key={kind}>
+                    <h2>
+                      {kind === "Captains & vice"
+                        ? "Leigh Barnes Trophy · Captains & vice"
+                        : kind}
+                    </h2>
+                    {categoryStandings(results, kind, season, week).map((r) => (
+                      <div className="result-row" key={r.name}>
+                        <span>{r.name}</span>
+                        <strong className="score">{r.value}</strong>
+                      </div>
+                    ))}
+                    {!categoryStandings(results, kind, season, week).length && (
+                      <p className="muted">No category totals recorded.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               className="secondary"
-              disabled={!stats.length}
+              disabled={!statsReady || !stats.length}
               onClick={() => downloadCSV("player-statistics.csv", stats)}
             >
               <Download size={16} /> Export CSV for Excel
@@ -889,7 +935,7 @@ export default function Workspace() {
           <>
             <div className="card">
               <div className="card-head">
-                <h2>Fixtures & results</h2>
+                <h2>Fixture schedule</h2>
                 <span className="badge">{competition}</span>
               </div>
               {fixtures
@@ -900,13 +946,6 @@ export default function Workspace() {
                 )
                 .sort((a, b) => a.date.localeCompare(b.date))
                 .map((f) => {
-                  const r = results.find(
-                    (r) =>
-                      r.home === f.home &&
-                      r.away === f.away &&
-                      r.date === f.date &&
-                      r.competition === f.competition,
-                  );
                   return (
                     <div className="result-row" key={f.id}>
                       <div>
@@ -914,54 +953,27 @@ export default function Workspace() {
                         <h3>
                           {f.home} vs {f.away}
                         </h3>
-                        <p className="muted">
-                          {r
-                            ? r.approved
-                              ? "Approved"
-                              : "Draft"
-                            : "Awaiting result"}
-                        </p>
-                      </div>
-                      <div>
-                        {r && (
-                          <span className="score">
-                            {r.homeWins} – {r.awayWins}
-                          </span>
-                        )}
-                        <button
-                          className="secondary"
-                          disabled={demo || busy}
-                          onClick={() => {
-                            if (r) void editResult(r.id);
-                            else {
-                              chooseFixture(f.id);
-                              setScreen("Add Result");
-                            }
-                          }}
-                          style={{ marginLeft: 8 }}
-                        >
-                          {r ? "Edit" : "Add result"}
-                        </button>
                       </div>
                     </div>
                   );
                 })}
               {!fixtures.length && (
                 <div className="empty">
-                  No fixtures yet. Register teams and players, then add a
-                  fixture below.
+                  No fixtures yet. Add the schedule in More → Teams & players.
                 </div>
               )}
             </div>
-            <SetupForms
-              clientReady={Boolean(client) && !demo}
-              teams={teams}
-              seasons={seasons}
-              players={players}
-              reload={load}
-              notify={setMessage}
-            />
           </>
+        )}
+        {screen === "Teams & players" && (
+          <SetupForms
+            clientReady={Boolean(client) && !demo}
+            teams={teams}
+            seasons={seasons}
+            players={players}
+            reload={load}
+            notify={setMessage}
+          />
         )}
         {screen === "Add Result" && (
           <>
@@ -970,8 +982,15 @@ export default function Workspace() {
               <label style={{ marginTop: 18 }}>
                 Fixture
                 <select
+                  disabled={busy}
                   value={fixtureId}
-                  onChange={(e) => chooseFixture(e.target.value)}
+                  onChange={(e) => {
+                    const existing = results.find(
+                      (r) => r.fixtureId === e.target.value,
+                    );
+                    if (existing) void editResult(existing.id);
+                    else chooseFixture(e.target.value);
+                  }}
                 >
                   <option value="">Choose a fixture</option>
                   {fixtures
@@ -990,15 +1009,15 @@ export default function Workspace() {
                 <div className="card">
                   <h2>2. Keep the original sheet</h2>
                   <p className="muted">
-                    Keep the original photograph here, then select the players
-                    and tap each winning team below. No scanning is needed.
+                    Keep the original photograph with the result. No scanning is
+                    needed.
                   </p>
                   <label>
                     Original photograph (JPEG, PNG or WebP, up to 10 MB)
                     <input
+                      disabled={busy}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
-                      capture="environment"
                       onChange={(e) => {
                         setFile(e.target.files?.[0] ?? null);
                         setSheetId(null);
@@ -1021,113 +1040,72 @@ export default function Workspace() {
                     >
                       {sheetId
                         ? "Upload an additional original"
-                        : "Archive photograph"}
+                        : "Save photograph"}
                     </button>
                     {sheetId && (
                       <span className="badge">Original archived</span>
                     )}
                   </div>
                 </div>
-                <div className="card">
-                  <h2>
-                    3.{" "}
-                    {review
-                      ? "Review all 12 games"
-                      : "Enter games & player statistics"}
-                  </h2>
-                  <p className="muted">
-                    {selected.competition === "league"
-                      ? "3 pairs · 2 trebles · captains & vice · 6 singles"
-                      : "12 singles"}
-                    . Assign each player to a team before entering results.
-                  </p>
-                  {review ? (
-                    <>
-                      <div className="notice">
-                        Check against the original sheet before approving. Home{" "}
-                        {games.filter((g) => g.winner === "home").length} – Away{" "}
-                        {games.filter((g) => g.winner === "away").length}
-                      </div>
-                      {games.map((g) => (
-                        <div className="game" key={g.number}>
-                          <strong>
-                            {g.number}. {g.kind} ·{" "}
-                            {g.winner === "home"
-                              ? selected.home
-                              : selected.away}{" "}
-                            won
-                          </strong>
-                          {g.players.map((p, i) => (
-                            <p className="muted" key={i}>
-                              {players.find((x) => x.id === p.player_id)?.name}{" "}
-                              ({p.side}) · Double 1s: {p.double_ones} · Score:{" "}
-                              {p.highest_score ?? "—"} · Checkout:{" "}
-                              {p.highest_checkout ?? "—"}
-                            </p>
-                          ))}
-                        </div>
-                      ))}
-                      <div className="actions">
-                        <button
-                          className="secondary"
-                          onClick={() => setReview(false)}
-                        >
-                          Make corrections
-                        </button>
-                        <button
-                          className="primary"
-                          disabled={demo || busy || !formComplete || !sheetId}
-                          onClick={approve}
-                        >
-                          Approve & save result
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="notice" role="status">
-                        {games.filter(gameComplete).length} of 12 games complete
-                        · {selected.home}{" "}
-                        {games.filter((g) => g.winner === "home").length} –{" "}
-                        {games.filter((g) => g.winner === "away").length}{" "}
-                        {selected.away}
-                        <div>
-                          Players used earlier appear first. Reuse an earlier
-                          lineup when the same players return. Only open
-                          statistics when there is something to record.
-                        </div>
-                      </div>
-                      {games.map((g, index) => (
-                        <ManualGameEntry
-                          key={`${fixtureId}:${g.number}`}
-                          game={g}
-                          previous={games.slice(0, index)}
-                          home={selected.home}
-                          away={selected.away}
-                          roster={players
-                            .filter(
-                              (p) =>
-                                p.team_id === selected.home_team_id ||
-                                p.team_id === selected.away_team_id,
-                            )
-                            .map((p) => ({
-                              id: p.id,
-                              name: p.name,
-                              side:
-                                p.team_id === selected.home_team_id
-                                  ? ("home" as const)
-                                  : ("away" as const),
-                            }))}
-                          onChange={(next) =>
-                            setGames((gs) =>
-                              gs.map((entry, i) =>
-                                i === index ? next : entry,
-                              ),
-                            )
-                          }
-                        />
-                      ))}
-                      <div className="actions">
+                {!detailed && (
+                  <div className="card">
+                    {!summaryReady && (
+                      <p className="notice">
+                        Simplified saving is awaiting the one-time database
+                        update. Please complete that update before entering a
+                        new result.
+                      </p>
+                    )}
+                    <h2>
+                      {review
+                        ? "3. Check your result"
+                        : "3. Scores & achievements"}
+                    </h2>
+                    <SummaryEntry
+                      value={summary}
+                      onChange={setSummary}
+                      cup={selected.competition === "cup"}
+                      home={selected.home}
+                      away={selected.away}
+                      readOnly={review}
+                      players={players
+                        .filter(
+                          (p) =>
+                            p.team_id === selected.home_team_id ||
+                            p.team_id === selected.away_team_id,
+                        )
+                        .map((p) => ({
+                          ...p,
+                          side:
+                            p.team_id === selected.home_team_id
+                              ? "home"
+                              : "away",
+                        }))}
+                    />
+                    <div className="actions">
+                      {review ? (
+                        <>
+                          <button
+                            className="secondary"
+                            onClick={() => setReview(false)}
+                          >
+                            Make corrections
+                          </button>
+                          <button
+                            className="primary"
+                            disabled={
+                              demo ||
+                              busy ||
+                              !formComplete ||
+                              !sheetId ||
+                              !summaryReady
+                            }
+                            onClick={approve}
+                          >
+                            Approve & save result
+                          </button>
+                        </>
+                      ) : (
                         <button
                           className="primary"
                           disabled={!formComplete}
@@ -1135,24 +1113,146 @@ export default function Workspace() {
                         >
                           Review result
                         </button>
-                      </div>
-                      {!formComplete && (
-                        <p className="muted">
-                          Select every player and winner, and check that
-                          statistics are valid, to review.
-                        </p>
                       )}
-                    </>
-                  )}
-                </div>
+                    </div>
+                    {!sheetId && (
+                      <p className="muted">
+                        Save the original photograph before approving.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {detailed && (
+                  <div className="card">
+                    <h2>
+                      3.{" "}
+                      {review
+                        ? "Review all 12 games"
+                        : "Enter games & player statistics"}
+                    </h2>
+                    <p className="muted">
+                      {selected.competition === "league"
+                        ? "3 pairs · 2 trebles · captains & vice · 6 singles"
+                        : "12 singles"}
+                      . Assign each player to a team before entering results.
+                    </p>
+                    {review ? (
+                      <>
+                        <div className="notice">
+                          Check against the original sheet before approving.
+                          Home {games.filter((g) => g.winner === "home").length}{" "}
+                          – Away{" "}
+                          {games.filter((g) => g.winner === "away").length}
+                        </div>
+                        {games.map((g) => (
+                          <div className="game" key={g.number}>
+                            <strong>
+                              {g.number}. {g.kind} ·{" "}
+                              {g.winner === "home"
+                                ? selected.home
+                                : selected.away}{" "}
+                              won
+                            </strong>
+                            {g.players.map((p, i) => (
+                              <p className="muted" key={i}>
+                                {
+                                  players.find((x) => x.id === p.player_id)
+                                    ?.name
+                                }{" "}
+                                ({p.side}) · Double 1s: {p.double_ones} · Score:{" "}
+                                {p.highest_score ?? "—"} · Checkout:{" "}
+                                {p.highest_checkout ?? "—"}
+                              </p>
+                            ))}
+                          </div>
+                        ))}
+                        <div className="actions">
+                          <button
+                            className="secondary"
+                            onClick={() => setReview(false)}
+                          >
+                            Make corrections
+                          </button>
+                          <button
+                            className="primary"
+                            disabled={demo || busy || !formComplete || !sheetId}
+                            onClick={approve}
+                          >
+                            Approve & save result
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="notice" role="status">
+                          {games.filter(gameComplete).length} of 12 games
+                          complete · {selected.home}{" "}
+                          {games.filter((g) => g.winner === "home").length} –{" "}
+                          {games.filter((g) => g.winner === "away").length}{" "}
+                          {selected.away}
+                          <div>
+                            Players used earlier appear first. Reuse an earlier
+                            lineup when the same players return. Only open
+                            statistics when there is something to record.
+                          </div>
+                        </div>
+                        {games.map((g, index) => (
+                          <ManualGameEntry
+                            key={`${fixtureId}:${g.number}`}
+                            game={g}
+                            previous={games.slice(0, index)}
+                            home={selected.home}
+                            away={selected.away}
+                            roster={players
+                              .filter(
+                                (p) =>
+                                  p.team_id === selected.home_team_id ||
+                                  p.team_id === selected.away_team_id,
+                              )
+                              .map((p) => ({
+                                id: p.id,
+                                name: p.name,
+                                side:
+                                  p.team_id === selected.home_team_id
+                                    ? ("home" as const)
+                                    : ("away" as const),
+                              }))}
+                            onChange={(next) =>
+                              setGames((gs) =>
+                                gs.map((entry, i) =>
+                                  i === index ? next : entry,
+                                ),
+                              )
+                            }
+                          />
+                        ))}
+                        <div className="actions">
+                          <button
+                            className="primary"
+                            disabled={!formComplete}
+                            onClick={() => setReview(true)}
+                          >
+                            Review result
+                          </button>
+                        </div>
+                        {!formComplete && (
+                          <p className="muted">
+                            Select every player and winner, and check that
+                            statistics are valid, to review.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </>
         )}
-        {screen === "Archive" && (
+        {screen === "Results" && (
           <>
             <div className="card">
-              <h2>Original result sheets</h2>
+              <h2>Saved results & original sheets</h2>
               <div className="fields" style={{ marginTop: 16 }}>
                 <label>
                   Team
@@ -1171,10 +1271,56 @@ export default function Workspace() {
                   />
                 </label>
               </div>
+              {results
+                .filter(
+                  (r) =>
+                    r.season === season &&
+                    r.competition === competition &&
+                    (!archiveDate || r.date === archiveDate) &&
+                    `${r.home} ${r.away}`
+                      .toLowerCase()
+                      .includes(teamFilter.toLowerCase()),
+                )
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .map((r) => (
+                  <div className="result-row" key={r.id}>
+                    <div>
+                      <strong>
+                        {r.home} {r.homeWins} – {r.awayWins} {r.away}
+                      </strong>
+                      <p className="muted">
+                        {dateLabel(r.date)} ·{" "}
+                        {r.approved ? "Approved" : "Draft"}
+                      </p>
+                    </div>
+                    <div className="actions">
+                      <button
+                        className="secondary"
+                        disabled={demo || busy}
+                        onClick={() => editResult(r.id)}
+                      >
+                        View / edit result
+                      </button>
+                      {sheets
+                        .filter((s) => s.fixture_id === r.fixtureId)
+                        .map((s, i) => (
+                          <button
+                            className="secondary"
+                            key={s.id}
+                            onClick={() => openSheet(s)}
+                          >
+                            Original photo {i + 1}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+
               {sheets
                 .filter((s) => {
                   const f = fixtures.find((f) => f.id === s.fixture_id);
                   return (
+                    !results.some((r) => r.fixtureId === s.fixture_id) &&
                     f?.season === season &&
                     f.competition === competition &&
                     (!archiveDate || f.date === archiveDate) &&
@@ -1192,7 +1338,8 @@ export default function Workspace() {
                           {f.home} vs {f.away}
                         </strong>
                         <p className="muted">
-                          {dateLabel(f.date)} · {f.competition}
+                          {dateLabel(f.date)} · {f.competition} · Result not yet
+                          saved
                         </p>
                       </div>
                       <button
@@ -1204,13 +1351,16 @@ export default function Workspace() {
                     </div>
                   );
                 })}
-              {!sheets.length && (
-                <div className="empty">
-                  <ImageIcon style={{ margin: "0 auto 12px" }} />
-                  Original photographs will appear here after secure upload.
-                  Corrections retain every original.
-                </div>
-              )}
+              {!sheets.length &&
+                !results.some(
+                  (r) => r.season === season && r.competition === competition,
+                ) && (
+                  <div className="empty">
+                    <ImageIcon style={{ margin: "0 auto 12px" }} />
+                    Saved results and their original photographs will appear
+                    here.
+                  </div>
+                )}
             </div>
             {archivePreview && (
               <div className="card">
@@ -1267,7 +1417,7 @@ export default function Workspace() {
                       try {
                         const url = await toPng(weeklyRef.current, {
                           pixelRatio: 2,
-                          backgroundColor: "#fff8fb",
+                          backgroundColor: "#ffffff",
                         });
                         const a = document.createElement("a");
                         a.download = `CCLDL-${week}${demo ? "-DEMO" : ""}.png`;
@@ -1279,59 +1429,29 @@ export default function Workspace() {
                         setBusy(false);
                       }
                     }}
-                    disabled={busy}
+                    disabled={busy || !statsReady || !week}
                   >
                     <Download size={16} /> Download PNG
                   </button>
                 </div>
               </div>
               <p className="muted">
-                Cutoff is inclusive. Historical views use currently approved,
-                corrected records; frozen historical publication snapshots are
-                planned for Phase 2.
+                Download the image and attach it to your Facebook group post.
+                The image keeps the same readable layout on every phone.
+                Previous dates use the latest corrected results.
               </p>
             </div>
-            <div ref={weeklyRef} className="week">
-              <span className="eyebrow">
-                Chelmsford City Ladies Darts League
-              </span>
-              <h1>Weekly overview</h1>
-              <p className="muted">
-                {season} · Through {dateLabel(week)}
-                {demo ? " · FICTIONAL DEMONSTRATION" : ""}
-              </p>
-              <div className="notice">
-                {incomplete.length
-                  ? `Incomplete: ${incomplete.length} scheduled fixtures through this date await approved results.`
-                  : "All recorded fixtures through this date have approved results. Schedule completeness has not been independently confirmed."}
-              </div>
-              <div className="card">
-                <h2>League table</h2>
-                <Table
-                  results={results}
-                  competition="league"
-                  cutoff={week}
-                  season={season}
-                />
-              </div>
-              <div className="card">
-                <h2>Cup table</h2>
-                <Table
-                  results={results}
-                  competition="cup"
-                  cutoff={week}
-                  season={season}
-                />
-              </div>
-              <p className="muted">
-                Player statistics · {competition} only (select competition in
-                Stats)
-              </p>
-              {statPanel("d1", "Most Double 1s")}
-              {statPanel("checkout", "Highest checkout")}
-              {statPanel("score", "Highest score")}
-              <p className="eyebrow">CCLDL · Every game counts</p>
-            </div>
+            <PosterPreview posterRef={weeklyRef}>
+              <WeeklyPoster
+                results={results}
+                stats={stats}
+                season={season}
+                week={week}
+                competition={competition}
+                incomplete={incomplete.length}
+                demo={demo}
+              />
+            </PosterPreview>
           </>
         )}
         {screen === "More" && (
@@ -1340,7 +1460,7 @@ export default function Workspace() {
               <button
                 className="nav-item"
                 onClick={() => {
-                  navigate("Fixtures");
+                  navigate("Teams & players");
                   window.setTimeout(
                     () =>
                       document
@@ -1359,7 +1479,9 @@ export default function Workspace() {
               </button>
               {nav
                 .filter((n) =>
-                  ["Tables", "Archive", "Weekly Overview"].includes(n.name),
+                  ["Results", "Weekly Overview", "Teams & players"].includes(
+                    n.name,
+                  ),
                 )
                 .map(({ name, icon: Icon }) => (
                   <button
@@ -1408,7 +1530,7 @@ export default function Workspace() {
           { name: "Home", icon: Home },
           { name: "Fixtures", icon: CalendarDays },
           { name: "Add Result", icon: Plus },
-          { name: "Stats", icon: BarChart3 },
+          { name: "Tables", icon: BarChart3 },
           { name: "More", icon: Menu },
         ].map(({ name, icon: Icon }) => (
           <button
@@ -1416,7 +1538,9 @@ export default function Workspace() {
             className={
               screen === name ||
               (name === "More" &&
-                ["Tables", "Archive", "Weekly Overview"].includes(screen))
+                ["Results", "Weekly Overview", "Teams & players"].includes(
+                  screen,
+                ))
                 ? "active"
                 : ""
             }

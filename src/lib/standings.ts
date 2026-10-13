@@ -1,5 +1,8 @@
 export type Result = {
   id: string;
+  fixtureId?: string;
+  breakdown?: Record<string, number>;
+  summary?: import("./result-summary").Summary;
   season: string;
   competition: "league" | "cup";
   date: string;
@@ -56,8 +59,12 @@ export function standings(
       rows.set(team, row);
     }
   }
-  // Alphabetical display until the committee confirms ranking and tie-break rules.
-  return [...rows.values()].sort((a, b) => a.team.localeCompare(b.team));
+  // League points confirmed by committee; no additional tie-break rule.
+  return [...rows.values()].sort(
+    (a, b) =>
+      (competition === "league" ? b.gamesFor - a.gamesFor : 0) ||
+      a.team.localeCompare(b.team),
+  );
 }
 export function gameTypes(competition: "league" | "cup") {
   return competition === "cup"

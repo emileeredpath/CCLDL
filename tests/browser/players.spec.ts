@@ -14,10 +14,6 @@ test("Team rosters and optional CSV review show duplicates and editable issues",
   await expect(
     page.getByRole("heading", { name: "Players by team" }),
   ).toBeVisible();
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "Fixtures", exact: true })
-    .click();
   await page.getByLabel("Find a team or player").fill("Pink Player 1");
   await expect(
     page.getByRole("list", { name: "Pink Arrows roster" }),
@@ -65,22 +61,25 @@ test("Typing a name needs explicit selection and filters by team", async ({
     .getByRole("button", { name: "Add Result", exact: true })
     .click();
   await page.getByRole("combobox", { name: /^Fixture/ }).selectOption("f1");
-  const game = page.getByRole("region", { name: "Game 1", exact: true });
-  const input = game.getByRole("combobox", {
-    name: "Pink Arrows player 1",
-    exact: true,
-  });
+  await page
+    .getByRole("button", { name: "+ Add player achievement", exact: true })
+    .click();
+  const input = page.getByRole("combobox", { name: "Achievement player 1" });
   await input.fill("Pink Player 3");
   await expect(
-    game.getByRole("option", { name: "Pink Player 3" }),
+    page.getByRole("option", { name: "Pink Player 3 · Pink Arrows" }),
   ).toBeVisible();
   await input.press("Enter");
-  await expect(input).toHaveValue("Pink Player 3");
+  await expect(input).toHaveValue("Pink Player 3 · Pink Arrows");
   await input.fill("Not Registered");
-  await expect(game).toContainText("No matching players");
+  await expect(
+    page.getByText("No matching players", { exact: false }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Review result", exact: true }),
   ).toBeDisabled();
-  await input.fill("City Player");
-  await expect(game.getByRole("option")).toHaveCount(0);
+  await input.fill("Foxes Player");
+  await expect(page.locator(".player-picker").getByRole("option")).toHaveCount(
+    0,
+  );
 });

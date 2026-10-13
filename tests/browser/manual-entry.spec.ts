@@ -1,138 +1,70 @@
-import { test, expect, type Locator } from "@playwright/test";
-async function pick(input: Locator, name: string) {
-  await input.fill(name);
-  await input.press("ArrowDown");
-  await input.press("Enter");
-}
-
-test("Quick manual entry reuses players without copying stats and removes the scanner", async ({
+import { test, expect } from "@playwright/test";
+test("Summary entry requires all categories, checks achievements and calculates final score", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("http://127.0.0.1:3001");
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Add Result", exact: true })
     .click();
   await page.getByRole("combobox", { name: /^Fixture/ }).selectOption("f1");
-  await page.locator("input[type=file]").setInputFiles({
-    name: "example.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aA8sAAAAASUVORK5CYII=",
-      "base64",
-    ),
+  const review = page.getByRole("button", {
+    name: "Review result",
+    exact: true,
   });
-  await expect(page.getByRole("button", { name: /Scan photo/ })).toHaveCount(0);
+  await expect(review).toBeDisabled();
+  for (const [kind, n] of [
+    ["Pairs", "2"],
+    ["Trebles", "1"],
+    ["Captains & vice", "0"],
+    ["Singles", "5"],
+  ])
+    await page
+      .getByLabel(`Pink Arrows ${kind} wins`, { exact: true })
+      .selectOption(n);
+  await expect(page.locator(".score-summary-row.total")).toHaveText(
+    "Final score84",
+  );
+  await expect(review).toBeEnabled();
+  await page
+    .getByRole("button", { name: "+ Add player achievement", exact: true })
+    .click();
+  await expect(review).toBeDisabled();
+  const input = page.getByRole("combobox", { name: "Achievement player 1" });
+  await input.fill("Pink Player 1");
+  await input.press("ArrowDown");
+  await input.press("Enter");
+  await page.getByLabel("Highest score", { exact: true }).fill("181");
+  await expect(review).toBeDisabled();
+  await page.getByLabel("Highest score", { exact: true }).fill("140");
+  await page.getByLabel("Double 1s", { exact: true }).fill("2");
+  await review.click();
   await expect(
-    page.getByRole("button", { name: "Archive photograph" }),
+    page.getByRole("heading", { name: "3. Check your result" }),
   ).toBeVisible();
-  const first = page.getByRole("region", { name: "Game 1", exact: true });
-  const second = page.getByRole("region", { name: "Game 2", exact: true });
-  await first.getByRole("button", { name: "Pink Arrows", exact: true }).click();
-  await expect(
-    first.getByRole("button", { name: "Pink Arrows", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await pick(
-    first.getByLabel("Pink Arrows player 1", { exact: true }),
-    "Pink Player 1",
+  await expect(page.getByLabel("Highest score", { exact: true })).toHaveValue(
+    "140",
   );
-  await first
-    .getByLabel("Pink Arrows player 2", { exact: true })
-    .fill("Pink Player 1");
   await expect(
-    first.getByRole("option", { name: "Pink Player 1", exact: true }),
-  ).toHaveCount(0);
-  await pick(
-    first.getByLabel("Pink Arrows player 2", { exact: true }),
-    "Pink Player 2",
+    page.getByRole("button", { name: "Approve & save result" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Make corrections" }).click();
+  await expect(input).toHaveValue("Pink Player 1 · Pink Arrows");
+  await input.fill("City Player 2");
+  await input.press("ArrowDown");
+  await input.press("Enter");
+  await expect(page.getByLabel("Highest score", { exact: true })).toHaveValue(
+    "",
   );
-  await first.locator("summary").first().click();
-  await first.getByLabel("Double 1s", { exact: true }).first().fill("2");
-  await second
-    .getByLabel("Reuse home lineup", { exact: true })
-    .selectOption("1");
-  await expect(
-    second.getByLabel("Pink Arrows player 1", { exact: true }),
-  ).toHaveValue("Pink Player 1");
-  await expect(
-    second.getByLabel("Pink Arrows player 2", { exact: true }),
-  ).toHaveValue("Pink Player 2");
-  await expect(
-    second.getByLabel("Reuse home lineup", { exact: true }),
-  ).toBeDisabled();
-  await second.locator("summary").first().click();
-  await expect(
-    second.getByLabel("Double 1s", { exact: true }).first(),
-  ).toHaveValue("0");
-  await expect(
-    second.getByRole("button", { name: "Pink Arrows", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
-  await expect(
-    second.getByLabel("City Belles player 1", { exact: true }),
-  ).toHaveValue("");
-  await expect(
-    page.getByRole("button", { name: "Review result", exact: true }),
-  ).toBeDisabled();
+  await expect(review).toBeDisabled();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await pick(
-    first.getByLabel("Pink Arrows player 1", { exact: true }),
-    "Pink Player 3",
-  );
-  await expect(
-    first.getByLabel("Double 1s", { exact: true }).first(),
-  ).toHaveValue("0");
-  await first.getByRole("button", { name: "Clear winner" }).click();
-  await expect(
-    first.getByRole("button", { name: "Pink Arrows", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
-});
-test("All 12 manually completed games reach review with the right total", async ({
-  page,
-}) => {
-  await page.goto("http://127.0.0.1:3001");
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "Add Result", exact: true })
-    .click();
-  await page.getByRole("combobox", { name: /^Fixture/ }).selectOption("f1");
-  for (let n = 1; n <= 12; n++) {
-    const game = page.getByRole("region", { name: `Game ${n}`, exact: true });
-    await game
-      .getByRole("button", {
-        name: n % 2 ? "Pink Arrows" : "City Belles",
-        exact: true,
-      })
-      .click();
-    for (const [team, id] of [
-      ["Pink Arrows", "pink"],
-      ["City Belles", "city"],
-    ]) {
-      const selects = game.getByRole("combobox", {
-        name: new RegExp(`^${team} player`),
-      });
-      for (let i = 0; i < (await selects.count()); i++)
-        await pick(
-          selects.nth(i),
-          `${id[0].toUpperCase() + id.slice(1)} Player ${i + 1}`,
-        );
-    }
-  }
-  await expect(page.getByText(/12 of 12 games complete/)).toBeVisible();
-  await page
-    .getByRole("button", { name: "Review result", exact: true })
-    .click();
-  await expect(page.getByText(/Home 6 – Away 6/)).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Approve & save result" }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: "Make corrections" }).click();
-  await expect(
-    page
-      .getByRole("region", { name: "Game 1", exact: true })
-      .getByLabel("Pink Arrows player 1", { exact: true }),
-  ).toHaveValue("Pink Player 1");
+  await page.screenshot({
+    path: "test-results/summary-phone.png",
+    fullPage: true,
+  });
 });

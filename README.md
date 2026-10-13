@@ -1,6 +1,6 @@
 # CCLDL — Chelmsford City Ladies Darts League
 
-Phase 1: private committee application foundation. Next.js 16, TypeScript, Tailwind 4, Supabase, installable PWA. No deployment or paid service has been provisioned.
+Phase 1: private committee application foundation. Next.js 16, TypeScript, Tailwind 4, Supabase, installable PWA. Railway hosts the app; Supabase holds private league records.
 
 ## Local development
 
@@ -27,7 +27,7 @@ Use the existing checkout in each isolated cloud task; no Git worktree is needed
 
 Use an existing project or approve creating one first. Do not paste credentials in chat or commit `.env.local`.
 
-1. Apply `supabase/migrations/202610130001_initial.sql` through the Supabase CLI (`supabase db push` after linking) or SQL editor. It creates only the confirmed 2026/27 season, **no teams, players, results or user accounts**. Review actual season dates before use; the initial season record uses September–August boundaries, which can be adjusted by the committee.
+1. For a new database, apply both files in `supabase/migrations/` in order. For an existing installation, apply only `202610130002_summary_results.sql`. The initial migration `supabase/migrations/202610130001_initial.sql` is run once through the Supabase CLI (`supabase db push` after linking) or SQL editor. It creates only the confirmed 2026/27 season, **no teams, players, results or user accounts**. Review actual season dates before use; the initial season record uses September–August boundaries, which can be adjusted by the committee.
 2. In Authentication settings, **disable Allow new users to sign up** and anonymous sign-ins. Password sign-in is supported; no registration form exists. Configure strong passwords and MFA for the committee in Supabase where available. MFA enforcement in the app is a later task.
 3. Create one shared committee user securely in the dashboard. Insert its user ID into `public.committee_members` using SQL editor. Membership cannot be granted or altered by browser clients:
 
@@ -37,29 +37,29 @@ insert into public.committee_members(user_id, role) values
 ```
 
 4. Put the project URL and **anon/publishable public key** in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put a service-role key in the browser, source or public variables. Only the public key is used by the application; RLS enforces membership.
-5. Start the app, log in with the shared committee account, and add real teams/players and fixtures via Fixtures → Season administration. Upload an image, enter every game/player, review, approve, edit, and verify the tables, stats, archive and audit history. Check a signed-out request and an authenticated nonmember are denied.
+5. Start the app, log in with the shared committee account, and add real teams/players and fixtures via More → Teams & players. Upload an image, enter category totals and optional player achievements, review, approve, edit, and verify Tables, Results and the audit history. Check a signed-out request and an authenticated nonmember are denied.
 
 Real backend flows require this integration acceptance check before claiming production readiness. Upload files: JPEG, PNG or WebP ≤10 MB. Convert iPhone HEIC files if necessary. Images are immutable in a private bucket; each new upload gets a unique path. Short-lived viewing links expire after 60 seconds. Never share those links outside the committee. A failed metadata insert after upload can leave a private orphan; recovery tooling is planned.
 
 ## Implemented foundation
 
-- Phone-first dashboard and Home / Fixtures / Add Result / Stats / More bottom navigation, plus desktop sidebar.
+- Phone-first dashboard and Home / Fixtures / Add Result / Tables / More bottom navigation, plus desktop sidebar.
 - Password login and fail-closed configuration screen; committee membership checks and PostgreSQL RLS on all public tables.
 - Teams, players, seasons and fixture creation. One shared committee account has management permissions. Edit history identifies that account, not the individual using it.
 - League 3 pairs, 2 trebles, 1 captains & vice, 6 singles; Cup 12 singles.
-- Original-photo upload, manual player-level statistics, review and transactional approval/replacement via `save_result`; corrections are audited and originals retained. Manual entry uses one-tap winners, recent player selections and optional lineup reuse; review remains mandatory.
+- Original-photo upload, category totals and optional player achievements, review and transactional approval via `save_summary_result`. Existing detailed results continue using `save_result`; corrections are audited and originals retained.
 - Approved-result tables, season and competition separation, player-stat aggregates, Excel-compatible CSV downloads.
-- Archive filters for season, team, match date and competition, short-lived original viewing and fixture/result history.
+- Results filters for season, team, match date and competition, short-lived original viewing and fixture/result history.
 - Weekly PNG export, date cutoff and missing-result flag.
 - Manifest, 192/512 PNG icons, safe service worker with an offline message. Authenticated records and photos are never cached.
 
-League points equal games won. Tables remain **alphabetical, not ranked** until ranking/tie-break rules are confirmed. Cup shows match/game totals, no invented points. Statistics remain scoped to the selected competition. Zero is displayed as zero, not a fabricated achievement.
+The Gail Wander Trophy is total league games won: pairs + trebles + singles + captains & vice. League tables show most points first, with equal points tied; alphabetical names within ties are only display order. Cup shows match/game totals, no invented points. Statistics remain scoped to the selected competition. Zero is displayed as zero, not a fabricated achievement.
 
 ## Phase 2 / limitations
 
 - Test against the real Supabase project, including RLS, storage and transaction behavior; add automated backend and browser tests before live use.
 - Fixture editing/deletion UI, player transfers and season-specific rosters, invitation/password recovery flows, photo recovery tooling, richer actor-labelled audit views and accessible UI polish.
-- Confirm League ranking/tie-break rules, Cup points/ranking and whether weekly player statistics should combine competitions.
+- Confirm further League tie-break rules, Cup points/ranking and whether weekly player statistics should combine competitions.
 - Historical PNGs currently use corrected records as of the selected match-date cutoff. They **do not** recreate what was known or published at that time. Immutable publication snapshots and historical revision reconstruction remain to be built.
 - Native device install checks, automated backup scheduling and restore drills remain to be tested. Photo scanning has been removed after poor real-world handwriting results.
 - CSV exports can be opened in Excel; native `.xlsx` exports are not yet implemented.
@@ -74,8 +74,8 @@ Use Supabase's supported backup/export features for your selected plan; do not a
 
 ## Validation performed in this cloud workspace
 
-- Production build, TypeScript check and 3 standings/game-format tests passed.
-- 3 Chromium browser tests passed: locked production screen; 390px mobile navigation with no page overflow, manual-entry notice and a real PNG download; desktop dashboard and PWA assets.
+- Production build and 14 unit tests passed (standings, detailed-entry helpers, summary scores and CSV parsing).
+- 6 Chromium browser tests passed: locked production screen, summary entry and CSV review at phone widths, searchable players, consolidated navigation, a real PNG download, desktop dashboard and PWA assets.
 - PostgreSQL 17 migration and SQL acceptance assertions passed using local auth/storage schema stubs: nonmember read/write denial, complete result approval, correction audit history and retention of originals. This validates SQL behavior, **not** Supabase auth/storage integration.
 - Dependency audit reported zero vulnerabilities after upgrading to Next.js 16.4.
 
@@ -92,20 +92,31 @@ To reproduce SQL checks, run an isolated disposable PostgreSQL 17 instance, then
 In this cloud browser, Next.js development-mode hydration was blocked by failed HMR WebSocket handshakes (both Turbopack and webpack). Production-mode browser flows passed. Use `npm run build && npm start` to review the app here; ordinary local development uses `npm run dev`. Cloud hot reload remains unverified.
 
 
-## Faster manual result entry
+## Simplified results and Facebook standings
 
-The unsuccessful experimental OCR scanner and its model downloads have been removed. Original photographs are still archived privately, and approving a result still requires an archived original and review of all 12 games. No migration or extra service is needed.
+Apply **only** `supabase/migrations/202610130002_summary_results.sql` to an existing database. It adds a summary column, validation and `save_summary_result`; it does not delete existing league records or photos. Existing RLS and audit triggers continue to apply. New result saving is gated until this update is detected. Do not rerun the initial migration on an existing project.
 
-Tap a team to select the game winner; clear or change it if needed. Each team's player dropdown puts names already selected in this match first and prevents selecting one player twice in the same game. A blank team lineup can be filled explicitly from an earlier game with the same number of players; scores and statistics are never copied. Partially filled lineups are preserved. Open a player's statistics only when there is a Double 1 finish, high score or checkout to record. Changing a player clears their statistics to prevent attribution to the wrong person.
+New League results use four home-win totals (3 pairs, 2 trebles, 1 captains & vice, 6 singles); away wins and the final score are calculated. Cup uses 12 singles. Only players with achievements need selection. Search for a saved name and add Double 1 counts, highest score (1–180) and/or checkout (1–170). No invented per-game results are created. Original photographs and review remain required before approval. Summary edits are atomic and audited. Older detailed results retain their original game/player editor, and cannot be silently replaced with totals.
 
-A running score and completed-game count show progress. Review stays disabled until every game has a winner, unique players and valid statistics. All games are shown again for final approval. The demo includes fictional rosters for trying this flow; nothing is inserted into Supabase.
+Home has no upcoming-fixture or approval/archive counters. Fixtures is only the saved schedule. More → Teams & players holds administration. Tables combines standings, category totals and player statistics. More → Results shows existing scores, edits, originals and history.
+
+Weekly Overview exports a 2160px-wide PNG with a responsive preview. Trophy headings match the committee's example: Lorraine Hudson Trophy / Highest Score, The Gail Wander Trophy, Highest Checkout, Pairs, Trebles, Singles, Leigh Barnes Trophy / Captains & vice, and The Pitt Stop Madhouse Trophy / Double 1 finishes. Cup stays separate. Equal leading totals share highlighting; Cup has no ranking highlight. Select the date and competition for player statistics; incomplete scheduled results and absent category breakdowns are flagged. Download the PNG and attach it to the Facebook group manually; nothing is posted automatically. Historical exports use currently corrected records.
+
+Validation: unit checks cover score bounds, duplicate players, competition/date/season separation and category aggregation. Browser checks cover 320px entry, CSV review, navigation and an actual PNG download. Database checks exercise both migrations, summary approval/edit validation, Cup, nonmember RLS denial, original retention, audit history and preservation/editing of detailed results. Live Supabase acceptance and actual iPhone/Android device checks remain separate.
+
+To repeat the additional database checks without installing a database server or changing app dependencies:
+
+```sh
+npm install --prefix /tmp/ccldl-db-test @electric-sql/pglite --cache /tmp/npm-cache --no-audit --no-fund
+PGLITE_MODULE=/tmp/ccldl-db-test/node_modules/@electric-sql/pglite/dist/index.js node tests/database/summary.mjs
+```
 
 ## Player lists, CSV import and name suggestions
 
-Fixtures → Season administration shows current players grouped by team, with search. CSV import is optional; individual player creation remains available. Use UTF-8 CSV with `name,team` and an optional `notes` column (a blank template is provided). Comma, semicolon and tab separators, quoted fields and Excel UTF-8 BOM are supported. Files are limited to 1 MB and 500 players. Preview and correct names/team assignments, check any transcription notes, and confirm before importing. Unknown/ambiguous teams and invalid rows block saving; matching names already on the same team and duplicates within the file are skipped. Add teams first. Notes are review-only and are not stored as player data.
+More → Teams & players shows current players grouped by team, with search. CSV import is optional; individual player creation remains available. Use UTF-8 CSV with `name,team` and an optional `notes` column (a blank template is provided). Comma, semicolon and tab separators, quoted fields and Excel UTF-8 BOM are supported. Files are limited to 1 MB and 500 players. Preview and correct names/team assignments, check any transcription notes, and confirm before importing. Unknown/ambiguous teams and invalid rows block saving; matching names already on the same team and duplicates within the file are skipped. Add teams first. Notes are review-only and are not stored as player data.
 
 Import rechecks existing teams/players immediately before sending one bulk insert through the signed-in Supabase client and existing committee RLS. It does not delete/overwrite players or automatically create teams. No migration or extra backend credential is needed. Duplicate detection is application-level; it is not a new database uniqueness constraint. CSV parsing/preview and duplicate/error handling are tested locally; the live bulk insert still needs acceptance testing with the committee account.
 
-During result entry, start typing a saved team member's name and choose a suggestion (or use arrow keys and Enter). Names already used in the match appear first. Players selected elsewhere in the same game are excluded. Unrecognised/free-typed names do not count as a selected player and prevent approval until an existing player is chosen. Statistics remain attached to the selected player/game; changing the selected player clears their prior stats. The sample rosters are still confined to demo mode.
+During result entry, start typing a saved team member's name and choose a suggestion (or use arrow keys and Enter). Only players from the fixture’s two teams are offered. Players already added to the achievement list are excluded. Existing detailed results keep their earlier lineup helpers. Unrecognised/free-typed names do not count as a selected player and prevent approval until an existing player is chosen. Statistics remain attached to the selected player/result; changing the selected player clears their prior stats. The sample rosters are still confined to demo mode.
 
 Phone shortcut: More → Teams & players opens roster management. Input controls and player suggestions use generous tap targets; the import preview is tested at 320px width as well as the result flow at 390px. Actual iPhone/Android device acceptance remains separate from these Chromium viewport checks.

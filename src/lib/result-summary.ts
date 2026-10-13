@@ -1,0 +1,73 @@
+import type { EntryPlayer } from "./manual-entry";
+export type Summary = {
+  counts: Record<string, number | null>;
+  achievements: EntryPlayer[];
+};
+export const categories = (cup: boolean) =>
+  cup
+    ? ([["Singles", 12]] as const)
+    : ([
+        ["Pairs", 3],
+        ["Trebles", 2],
+        ["Captains & vice", 1],
+        ["Singles", 6],
+      ] as const);
+export const emptySummary = (cup: boolean): Summary => ({
+  counts: Object.fromEntries(categories(cup).map(([k]) => [k, null])),
+  achievements: [],
+});
+export function summaryValid(s: Summary, cup: boolean) {
+  return (
+    categories(cup).every(
+      ([k, max]) =>
+        Number.isInteger(s.counts[k]) &&
+        s.counts[k]! >= 0 &&
+        s.counts[k]! <= max,
+    ) &&
+    new Set(s.achievements.map((p) => p.player_id)).size ===
+      s.achievements.length &&
+    s.achievements.every(
+      (p) =>
+        p.player_id &&
+        ["home", "away"].includes(p.side) &&
+        Number.isInteger(p.double_ones) &&
+        p.double_ones >= 0 &&
+        p.double_ones <= 999 &&
+        [p.highest_score, p.highest_checkout].every(
+          (n, i) =>
+            n === null ||
+            (Number.isInteger(n) && n > 0 && n <= (i === 0 ? 180 : 170)),
+        ) &&
+        (p.double_ones > 0 ||
+          p.highest_score !== null ||
+          p.highest_checkout !== null),
+    )
+  );
+}
+
+export function categoryStandings(
+  results: import("./standings").Result[],
+  kind: string,
+  season: string,
+  cutoff: string,
+) {
+  const totals = new Map<string, number>();
+  const maximum = categories(false).find(([k]) => k === kind)?.[1];
+  if (maximum === undefined) return [];
+  for (const r of results.filter(
+    (r) =>
+      r.approved &&
+      r.season === season &&
+      r.competition === "league" &&
+      r.date <= cutoff &&
+      r.breakdown,
+  )) {
+    const home = r.breakdown![kind];
+    if (!Number.isInteger(home) || home < 0 || home > maximum) continue;
+    totals.set(r.home, (totals.get(r.home) ?? 0) + home);
+    totals.set(r.away, (totals.get(r.away) ?? 0) + maximum - home);
+  }
+  return [...totals]
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+}

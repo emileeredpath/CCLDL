@@ -32,6 +32,12 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
     path: "test-results/dashboard-mobile.png",
     fullPage: true,
   });
+  await expect(
+    page.getByText("Upcoming fixtures", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText("Archived sheets", { exact: true })).toHaveCount(
+    0,
+  );
   const nav = page.getByRole("navigation", { name: "Main navigation" });
   await nav.getByRole("button", { name: "Add Result", exact: true }).click();
   await page.getByRole("combobox", { name: /^Fixture/ }).selectOption("f1");
@@ -39,13 +45,19 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
     page.getByText("No scanning is needed", { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Archive photograph" }),
+    page.getByRole("button", { name: "Save photograph" }),
   ).toBeDisabled();
   await nav.getByRole("button", { name: "Fixtures", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Fixtures & results" }),
+    page.getByRole("heading", { name: "Fixture schedule" }),
   ).toBeVisible();
-  await nav.getByRole("button", { name: "Stats", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Season administration" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save fixture" })).toHaveCount(
+    0,
+  );
+  await nav.getByRole("button", { name: "Tables", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Most Double 1 finishes" }),
   ).toBeVisible();
@@ -54,9 +66,25 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
     .getByRole("button", { name: "Weekly Overview", exact: true })
     .last()
     .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "The Gail Wander Trophy Overall league points",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "The Pitt Stop Madhouse Trophy Double 1 finishes",
+    }),
+  ).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PNG" }).click();
   const d = await download;
+  await d.saveAs("test-results/weekly.png");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
   expect(d.suggestedFilename()).toMatch(/CCLDL-.*-DEMO.png/);
   expect(await d.failure()).toBeNull();
   expect(errors).toEqual([]);
