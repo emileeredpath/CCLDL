@@ -47,7 +47,7 @@ Real backend flows require this integration acceptance check before claiming pro
 - Password login and fail-closed configuration screen; committee membership checks and PostgreSQL RLS on all public tables.
 - Teams, players, seasons and fixture creation. One shared committee account has management permissions. Edit history identifies that account, not the individual using it.
 - League 3 pairs, 2 trebles, 1 captains & vice, 6 singles; Cup 12 singles.
-- Original-photo upload, manual player-level statistics, review and transactional approval/replacement via `save_result`; corrections are audited and originals retained. Free, experimental browser OCR can suggest winners and exact registered player names for recognised tables; review remains mandatory.
+- Original-photo upload, manual player-level statistics, review and transactional approval/replacement via `save_result`; corrections are audited and originals retained. Manual entry uses one-tap winners, recent player selections and optional lineup reuse; review remains mandatory.
 - Approved-result tables, season and competition separation, player-stat aggregates, Excel-compatible CSV downloads.
 - Archive filters for season, team, match date and competition, short-lived original viewing and fixture/result history.
 - Weekly PNG export, date cutoff and missing-result flag.
@@ -61,7 +61,7 @@ League points equal games won. Tables remain **alphabetical, not ranked** until 
 - Fixture editing/deletion UI, player transfers and season-specific rosters, invitation/password recovery flows, photo recovery tooling, richer actor-labelled audit views and accessible UI polish.
 - Confirm League ranking/tie-break rules, Cup points/ranking and whether weekly player statistics should combine competitions.
 - Historical PNGs currently use corrected records as of the selected match-date cutoff. They **do not** recreate what was known or published at that time. Immutable publication snapshots and historical revision reconstruction remain to be built.
-- Handwritten-sheet accuracy, native device install checks, automated backup scheduling and restore drills remain to be tested. Free OCR does not extract Double 1s, highest scores or checkouts; enter those manually.
+- Native device install checks, automated backup scheduling and restore drills remain to be tested. Photo scanning has been removed after poor real-world handwriting results.
 - CSV exports can be opened in Excel; native `.xlsx` exports are not yet implemented.
 
 ## PWA
@@ -92,16 +92,10 @@ To reproduce SQL checks, run an isolated disposable PostgreSQL 17 instance, then
 In this cloud browser, Next.js development-mode hydration was blocked by failed HMR WebSocket handshakes (both Turbopack and webpack). Production-mode browser flows passed. Use `npm run build && npm start` to review the app here; ordinary local development uses `npm run dev`. Cloud hot reload remains unverified.
 
 
-## Free photo scanning (experimental)
+## Faster manual result entry
 
-On Add Result, select a fixture and photo, then choose **Scan photo for free**. Tesseract.js runs in a browser worker on the user's device. There is no scanning API, API key or per-image charge; usual Railway hosting/bandwidth usage still applies. Uploading the original to the existing private Supabase archive remains a separate action.
+The unsuccessful experimental OCR scanner and its model downloads have been removed. Original photographs are still archived privately, and approving a result still requires an archived original and review of all 12 games. No migration or extra service is needed.
 
-The worker, WebAssembly runtime and English model are served from this app's `/ocr` directory. `npm ci` and `npm run build` generate these assets from locked npm packages via `scripts/prepare-ocr.mjs`. Generated binaries are ignored by Git. No CDN is used at scan time; recognised text is kept only in component memory. It is not logged or written to the database. The initial download can be substantial on mobile data (the prepared directory is about 30 MB, with only the compatible engine loaded).
+Tap a team to select the game winner; clear or change it if needed. Each team's player dropdown puts names already selected in this match first and prevents selecting one player twice in the same game. A blank team lineup can be filled explicitly from an earlier game with the same number of players; scores and statistics are never copied. Partially filled lineups are preserved. Open a player's statistics only when there is a Double 1 finish, high score or checkout to record. Changing a player clears their statistics to prevent attribution to the wrong person.
 
-The extractor requires GAME / NAME / RES / NAME / RES headers and all 12 game numbers in order. It proposes a winner only when both score cells are recognised as 1 and 0. Player suggestions use unique exact roster names for the selected side, with the expected player count. Missing scores are never inferred from match totals, fuzzy names are not auto-matched, existing form entries are preserved, and statistics remain manual. Confirm the fixture and all suggestions against the original before filling blank fields; the normal final review/approval and private-photo requirements still apply.
-
-Clear printed synthetic sheets are used for automated OCR testing, alongside rejection of missing/low-confidence scores, ambiguous names, preservation of entered data and unsupported-file handling. These tests do not establish reliable recognition of real handwriting, including the example photo supplied in chat. Test representative real sheets and both phone platforms before relying on this as more than entry assistance. No automatic approval is performed.
-
-Cancel stops the active worker; leaving the scanner or changing the photo discards its suggestions. Scans have a two-minute timeout. If it cannot recognise the layout, use the displayed text as a reference or continue manual entry. Take upright, straight, well-lit photos and keep every table column in frame.
-
-Browser tests now build isolated unconfigured and fictional-demo versions themselves, so local Supabase connection variables do not change their expected results.
+A running score and completed-game count show progress. Review stays disabled until every game has a winner, unique players and valid statistics. All games are shown again for final approval. The demo includes fictional rosters for trying this flow; nothing is inserted into Supabase.

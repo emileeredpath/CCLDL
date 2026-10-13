@@ -37,6 +37,8 @@ export const demoResults: Result[] = [
 export const demoFixtures = [
   {
     id: "f1",
+    home_team_id: "demo-pink",
+    away_team_id: "demo-city",
     date: "2026-10-20",
     competition: "league",
     home: "Pink Arrows",
@@ -44,9 +46,20 @@ export const demoFixtures = [
   },
   {
     id: "f2",
+    home_team_id: "demo-foxes",
+    away_team_id: "demo-rose",
     date: "2026-10-20",
     competition: "league",
     home: "The Foxes",
     away: "Rose & Crown",
   },
 ];
+
+// Fictional rosters used only in the isolated demo and browser tests.
+export const demoPlayers = ["pink", "city", "foxes", "rose"].flatMap((team) =>
+  Array.from({ length: 8 }, (_, i) => ({
+    id: `demo-${team}-${i + 1}`,
+    name: `${team[0].toUpperCase() + team.slice(1)} Player ${i + 1}`,
+    team_id: `demo-${team}`,
+  })),
+);

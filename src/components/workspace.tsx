@@ -16,10 +16,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toPng } from "html-to-image";
-import SheetScanner from "@/components/sheet-scanner";
-import { fillEmptyGames } from "@/lib/scan-sheet";
+import ManualGameEntry from "@/components/manual-game-entry";
+import { gameComplete } from "@/lib/manual-entry";
 import { supabase } from "@/lib/supabase";
-import { demoFixtures, demoResults } from "@/lib/demo";
+import { demoFixtures, demoResults, demoPlayers } from "@/lib/demo";
 import { gameTypes, standings, type Result } from "@/lib/standings";
 const client = supabase();
 const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
@@ -284,6 +284,7 @@ export default function Workspace() {
     if (demo) {
       setResults(demoResults);
       setFixtures(demoFixtures);
+      setPlayers(demoPlayers);
       setReady(true);
       return;
     }
@@ -391,7 +392,7 @@ export default function Workspace() {
         );
       setSheetId(row.data.id);
       setMessage(
-        "Original photograph securely archived. Scan for suggestions or enter the games manually, then review.",
+        "Original photograph securely archived. Select the players and winners below, then review.",
       );
       await load();
     } catch (e) {
@@ -505,9 +506,7 @@ export default function Workspace() {
           r.away === f.away,
       ),
   );
-  const formComplete =
-    games.length === 12 &&
-    games.every((g) => g.winner && g.players.every((p) => p.player_id));
+  const formComplete = games.length === 12 && games.every(gameComplete);
   const navigate = (name: Screen) => {
     setScreen(name);
     setMessage("");
@@ -982,8 +981,8 @@ export default function Workspace() {
                 <div className="card">
                   <h2>2. Keep the original sheet</h2>
                   <p className="muted">
-                    Take a photo or upload a clear image. Try the free scanner
-                    for suggestions, or enter the details manually below.
+                    Keep the original photograph here, then select the players
+                    and tap each winning team below. No scanning is needed.
                   </p>
                   <label>
                     Original photograph (JPEG, PNG or WebP, up to 10 MB)
@@ -1020,33 +1019,6 @@ export default function Workspace() {
                     )}
                   </div>
                 </div>
-                {file && (
-                  <div className="card">
-                    <SheetScanner
-                      key={`${fixtureId}:${file.name}:${file.lastModified}`}
-                      file={file}
-                      roster={players
-                        .filter(
-                          (p) =>
-                            p.team_id === selected.home_team_id ||
-                            p.team_id === selected.away_team_id,
-                        )
-                        .map((p) => ({
-                          id: p.id,
-                          name: p.name,
-                          side:
-                            p.team_id === selected.home_team_id
-                              ? ("home" as const)
-                              : ("away" as const),
-                        }))}
-                      counts={games.map((g) => g.players.length / 2)}
-                      onApply={(suggestions) => {
-                        setGames((gs) => fillEmptyGames(gs, suggestions));
-                        setReview(false);
-                      }}
-                    />
-                  </div>
-                )}
                 <div className="card">
                   <h2>
                     3.{" "}
@@ -1104,139 +1076,47 @@ export default function Workspace() {
                     </>
                   ) : (
                     <>
-                      {games.map((g, index) => (
-                        <div className="game" key={g.number}>
-                          <h3>
-                            {g.number}. {g.kind}
-                          </h3>
-                          <label>
-                            Game winner
-                            <select
-                              value={g.winner}
-                              onChange={(e) =>
-                                setGames((gs) =>
-                                  gs.map((x, i) =>
-                                    i === index
-                                      ? { ...x, winner: e.target.value }
-                                      : x,
-                                  ),
-                                )
-                              }
-                            >
-                              <option value="">Choose winner</option>
-                              <option value="home">{selected.home}</option>
-                              <option value="away">{selected.away}</option>
-                            </select>
-                          </label>
-                          {g.players.map((p, j) => (
-                            <div
-                              key={j}
-                              className="game-fields"
-                              style={{ marginTop: 12 }}
-                            >
-                              <label>
-                                {p.side === "home"
-                                  ? selected.home
-                                  : selected.away}{" "}
-                                player {(j % (g.players.length / 2)) + 1}
-                                <select
-                                  value={p.player_id}
-                                  onChange={(e) =>
-                                    setGames((gs) =>
-                                      gs.map((x, i) =>
-                                        i === index
-                                          ? {
-                                              ...x,
-                                              players: x.players.map((q, k) =>
-                                                k === j
-                                                  ? {
-                                                      ...q,
-                                                      player_id: e.target.value,
-                                                    }
-                                                  : q,
-                                              ),
-                                            }
-                                          : x,
-                                      ),
-                                    )
-                                  }
-                                >
-                                  <option value="">Select player</option>
-                                  {players
-                                    .filter(
-                                      (x) =>
-                                        x.team_id ===
-                                        (p.side === "home"
-                                          ? selected.home_team_id
-                                          : selected.away_team_id),
-                                    )
-                                    .map((x) => (
-                                      <option key={x.id} value={x.id}>
-                                        {x.name}
-                                      </option>
-                                    ))}
-                                </select>
-                              </label>
-                              <div className="fields">
-                                {(
-                                  [
-                                    "double_ones",
-                                    "highest_score",
-                                    "highest_checkout",
-                                  ] as const
-                                ).map((key) => (
-                                  <label key={key}>
-                                    {key === "double_ones"
-                                      ? "Double 1s"
-                                      : key === "highest_score"
-                                        ? "High score"
-                                        : "Checkout"}
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      max={
-                                        key === "highest_score"
-                                          ? 180
-                                          : key === "highest_checkout"
-                                            ? 170
-                                            : 999
-                                      }
-                                      value={p[key] ?? ""}
-                                      onChange={(e) => {
-                                        const v =
-                                          e.target.value === ""
-                                            ? null
-                                            : Number(e.target.value);
-                                        setGames((gs) =>
-                                          gs.map((x, i) =>
-                                            i === index
-                                              ? {
-                                                  ...x,
-                                                  players: x.players.map(
-                                                    (q, k) =>
-                                                      k === j
-                                                        ? {
-                                                            ...q,
-                                                            [key]:
-                                                              key ===
-                                                              "double_ones"
-                                                                ? (v ?? 0)
-                                                                : v,
-                                                          }
-                                                        : q,
-                                                  ),
-                                                }
-                                              : x,
-                                          ),
-                                        );
-                                      }}
-                                    />
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
+                      <div className="notice" role="status">
+                        {games.filter(gameComplete).length} of 12 games complete
+                        · {selected.home}{" "}
+                        {games.filter((g) => g.winner === "home").length} –{" "}
+                        {games.filter((g) => g.winner === "away").length}{" "}
+                        {selected.away}
+                        <div>
+                          Players used earlier appear first. Reuse an earlier
+                          lineup when the same players return. Only open
+                          statistics when there is something to record.
                         </div>
+                      </div>
+                      {games.map((g, index) => (
+                        <ManualGameEntry
+                          key={g.number}
+                          game={g}
+                          previous={games.slice(0, index)}
+                          home={selected.home}
+                          away={selected.away}
+                          roster={players
+                            .filter(
+                              (p) =>
+                                p.team_id === selected.home_team_id ||
+                                p.team_id === selected.away_team_id,
+                            )
+                            .map((p) => ({
+                              id: p.id,
+                              name: p.name,
+                              side:
+                                p.team_id === selected.home_team_id
+                                  ? ("home" as const)
+                                  : ("away" as const),
+                            }))}
+                          onChange={(next) =>
+                            setGames((gs) =>
+                              gs.map((entry, i) =>
+                                i === index ? next : entry,
+                              ),
+                            )
+                          }
+                        />
                       ))}
                       <div className="actions">
                         <button
@@ -1249,7 +1129,8 @@ export default function Workspace() {
                       </div>
                       {!formComplete && (
                         <p className="muted">
-                          Select every player and winner to review.
+                          Select every player and winner, and check that
+                          statistics are valid, to review.
                         </p>
                       )}
                     </>

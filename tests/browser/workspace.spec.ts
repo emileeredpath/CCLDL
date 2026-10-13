@@ -36,7 +36,7 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
   await nav.getByRole("button", { name: "Add Result", exact: true }).click();
   await page.getByRole("combobox", { name: /^Fixture/ }).selectOption("f1");
   await expect(
-    page.getByText("Try the free scanner", { exact: false }),
+    page.getByText("No scanning is needed", { exact: false }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Archive photograph" }),
