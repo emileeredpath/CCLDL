@@ -519,3 +519,106 @@ input[type="file"] {
     gap: 4px;
   }
 }
+.player-picker {
+  position: relative;
+}
+.player-picker ul {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  list-style: none;
+  margin: 2px 0;
+  padding: 4px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  max-height: 220px;
+  overflow: auto;
+  box-shadow: 0 5px 15px #33232e18;
+}
+.player-picker li {
+  padding: 0;
+}
+.player-picker li.muted {
+  padding: 12px;
+}
+.player-picker [role="option"] {
+  border: 0;
+  background: white;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  padding: 12px;
+  width: 100%;
+  color: var(--ink);
+}
+.player-picker [role="option"]:hover,
+.player-picker [aria-selected="true"] {
+  background: #fae8ef;
+}
+.player-picker small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.csv-import {
+  margin: 24px 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.csv-player {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.import-confirm {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 18px;
+  line-height: 1.5;
+}
+.import-confirm input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+.team-rosters {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+.team-rosters details {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 10px;
+}
+.team-rosters summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.team-rosters ul {
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+.player-picker [role="option"] {
+  min-height: 44px;
+  overflow-wrap: anywhere;
+}
+.player-picker input,
+.csv-import input,
+.csv-import select {
+  min-height: 44px;
+}
+.team-rosters summary {
+  min-height: 30px;
+  line-height: 1.6;
+}
+#season-administration {
+  scroll-margin-top: 16px;
+}

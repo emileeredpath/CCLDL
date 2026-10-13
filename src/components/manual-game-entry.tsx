@@ -1,4 +1,5 @@
 "use client";
+import PlayerPicker from "@/components/player-picker";
 import {
   reuseLineup,
   gameComplete,
@@ -159,39 +160,15 @@ export default function ManualGameEntry({
                   <div className="manual-player" key={p.index}>
                     <label>
                       {team} player {slot + 1}
-                      <select
-                        aria-label={`${team} player ${slot + 1}`}
+                      <PlayerPicker
+                        label={`${team} player ${slot + 1}`}
                         value={p.player_id}
-                        onChange={(e) => changePlayer(p.index, e.target.value)}
-                      >
-                        <option value="">Select player</option>
-                        {recent.length > 0 && (
-                          <optgroup label="Used earlier this match">
-                            {recent.map((r) => (
-                              <option
-                                key={r.id}
-                                value={r.id}
-                                disabled={blocked(r.id)}
-                              >
-                                {r.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        <optgroup label="Team roster">
-                          {available
-                            .filter((r) => !recentIds.includes(r.id))
-                            .map((r) => (
-                              <option
-                                key={r.id}
-                                value={r.id}
-                                disabled={blocked(r.id)}
-                              >
-                                {r.name}
-                              </option>
-                            ))}
-                        </optgroup>
-                      </select>
+                        options={[
+                          ...recent.map((r) => ({ ...r, recent: true })),
+                          ...available.filter((r) => !recentIds.includes(r.id)),
+                        ].filter((r) => !blocked(r.id))}
+                        onChange={(id) => changePlayer(p.index, id)}
+                      />
                     </label>
                     <details open={hasStats || undefined}>
                       <summary>

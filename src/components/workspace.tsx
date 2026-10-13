@@ -14,8 +14,10 @@ import {
   ArrowUpRight,
   ShieldCheck,
   ChevronRight,
+  Users,
 } from "lucide-react";
 import { toPng } from "html-to-image";
+import PlayerCsvImport from "@/components/player-csv-import";
 import ManualGameEntry from "@/components/manual-game-entry";
 import { gameComplete } from "@/lib/manual-entry";
 import { supabase } from "@/lib/supabase";
@@ -285,6 +287,12 @@ export default function Workspace() {
       setResults(demoResults);
       setFixtures(demoFixtures);
       setPlayers(demoPlayers);
+      setTeams([
+        { id: "demo-pink", name: "Pink Arrows" },
+        { id: "demo-city", name: "City Belles" },
+        { id: "demo-foxes", name: "The Foxes" },
+        { id: "demo-rose", name: "Rose & Crown" },
+      ]);
       setReady(true);
       return;
     }
@@ -949,6 +957,7 @@ export default function Workspace() {
               clientReady={Boolean(client) && !demo}
               teams={teams}
               seasons={seasons}
+              players={players}
               reload={load}
               notify={setMessage}
             />
@@ -1090,7 +1099,7 @@ export default function Workspace() {
                       </div>
                       {games.map((g, index) => (
                         <ManualGameEntry
-                          key={g.number}
+                          key={`${fixtureId}:${g.number}`}
                           game={g}
                           previous={games.slice(0, index)}
                           home={selected.home}
@@ -1328,6 +1337,26 @@ export default function Workspace() {
         {screen === "More" && (
           <>
             <div className="card">
+              <button
+                className="nav-item"
+                onClick={() => {
+                  navigate("Fixtures");
+                  window.setTimeout(
+                    () =>
+                      document
+                        .getElementById("season-administration")
+                        ?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        }),
+                    0,
+                  );
+                }}
+              >
+                <Users size={20} />
+                Teams & players
+                <ChevronRight size={17} style={{ marginLeft: "auto" }} />
+              </button>
               {nav
                 .filter((n) =>
                   ["Tables", "Archive", "Weekly Overview"].includes(n.name),
@@ -1403,6 +1432,7 @@ export default function Workspace() {
   );
 }
 function SetupForms({
+  players,
   clientReady,
   teams,
   seasons,
@@ -1410,12 +1440,14 @@ function SetupForms({
   notify,
 }: {
   clientReady: boolean;
+  players: Option[];
   teams: Option[];
   seasons: Option[];
   reload: () => Promise<void>;
   notify: (s: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [rosterSearch, setRosterSearch] = useState("");
   async function submit(e: FormEvent<HTMLFormElement>, table: string) {
     e.preventDefault();
     if (!client || !clientReady) return;
@@ -1431,11 +1463,75 @@ function SetupForms({
     }
   }
   return (
-    <div className="card">
+    <div className="card" id="season-administration">
       <h2>Season administration</h2>
       <p className="muted">
         The committee account can manage teams, players, seasons and fixtures.
       </p>
+      <section aria-label="Team rosters" className="team-rosters">
+        <h3>Players by team</h3>
+        <p className="muted">
+          Current team lists. Add players individually below, or use the
+          optional CSV upload.
+        </p>
+        <label>
+          Find a team or player
+          <input
+            type="search"
+            value={rosterSearch}
+            onChange={(e) => setRosterSearch(e.target.value)}
+            placeholder="Type a team or player name"
+          />
+        </label>
+        {teams
+          .filter(
+            (t) =>
+              t.name.toLowerCase().includes(rosterSearch.toLowerCase()) ||
+              players.some(
+                (p) =>
+                  p.team_id === t.id &&
+                  p.name.toLowerCase().includes(rosterSearch.toLowerCase()),
+              ),
+          )
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((t) => {
+            const members = players
+              .filter((p) => p.team_id === t.id)
+              .sort((a, b) => a.name.localeCompare(b.name));
+            return (
+              <details key={t.id} open={Boolean(rosterSearch)}>
+                <summary>
+                  {t.name} · {members.length} players
+                </summary>
+                {members.length ? (
+                  <ul aria-label={`${t.name} roster`}>
+                    {members
+                      .filter(
+                        (p) =>
+                          !rosterSearch ||
+                          t.name
+                            .toLowerCase()
+                            .includes(rosterSearch.toLowerCase()) ||
+                          p.name
+                            .toLowerCase()
+                            .includes(rosterSearch.toLowerCase()),
+                      )
+                      .map((p) => (
+                        <li key={p.id}>{p.name}</li>
+                      ))}
+                  </ul>
+                ) : (
+                  <p className="muted">No players added yet.</p>
+                )}
+              </details>
+            );
+          })}
+        {!teams.length && (
+          <p className="muted">
+            Add your first team below to start its player list.
+          </p>
+        )}
+      </section>
       <div className="grid">
         <form onSubmit={(e) => submit(e, "teams")}>
           <h3>Add a team</h3>
@@ -1477,6 +1573,12 @@ function SetupForms({
           </button>
         </form>
       </div>
+      <PlayerCsvImport
+        teams={teams}
+        players={players}
+        enabled={clientReady}
+        reload={reload}
+      />
       <form onSubmit={(e) => submit(e, "fixtures")}>
         <h3>Add a fixture</h3>
         <div className="fields">

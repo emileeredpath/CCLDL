@@ -1,4 +1,10 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
+async function pick(input: Locator, name: string) {
+  await input.fill(name);
+  await input.press("ArrowDown");
+  await input.press("Enter");
+}
+
 test("Quick manual entry reuses players without copying stats and removes the scanner", async ({
   page,
 }) => {
@@ -8,16 +14,14 @@ test("Quick manual entry reuses players without copying stats and removes the sc
     .getByRole("button", { name: "Add Result", exact: true })
     .click();
   await page.getByRole("combobox", { name: /^Fixture/ }).selectOption("f1");
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "example.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aA8sAAAAASUVORK5CYII=",
-        "base64",
-      ),
-    });
+  await page.locator("input[type=file]").setInputFiles({
+    name: "example.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aA8sAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
   await expect(page.getByRole("button", { name: /Scan photo/ })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Archive photograph" }),
@@ -28,17 +32,20 @@ test("Quick manual entry reuses players without copying stats and removes the sc
   await expect(
     first.getByRole("button", { name: "Pink Arrows", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await first
-    .getByLabel("Pink Arrows player 1", { exact: true })
-    .selectOption("demo-pink-1");
-  await expect(
-    first
-      .getByLabel("Pink Arrows player 2", { exact: true })
-      .locator('option[value="demo-pink-1"]'),
-  ).toHaveJSProperty('disabled', true);
+  await pick(
+    first.getByLabel("Pink Arrows player 1", { exact: true }),
+    "Pink Player 1",
+  );
   await first
     .getByLabel("Pink Arrows player 2", { exact: true })
-    .selectOption("demo-pink-2");
+    .fill("Pink Player 1");
+  await expect(
+    first.getByRole("option", { name: "Pink Player 1", exact: true }),
+  ).toHaveCount(0);
+  await pick(
+    first.getByLabel("Pink Arrows player 2", { exact: true }),
+    "Pink Player 2",
+  );
   await first.locator("summary").first().click();
   await first.getByLabel("Double 1s", { exact: true }).first().fill("2");
   await second
@@ -46,10 +53,10 @@ test("Quick manual entry reuses players without copying stats and removes the sc
     .selectOption("1");
   await expect(
     second.getByLabel("Pink Arrows player 1", { exact: true }),
-  ).toHaveValue("demo-pink-1");
+  ).toHaveValue("Pink Player 1");
   await expect(
     second.getByLabel("Pink Arrows player 2", { exact: true }),
-  ).toHaveValue("demo-pink-2");
+  ).toHaveValue("Pink Player 2");
   await expect(
     second.getByLabel("Reuse home lineup", { exact: true }),
   ).toBeDisabled();
@@ -71,9 +78,10 @@ test("Quick manual entry reuses players without copying stats and removes the sc
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await first
-    .getByLabel("Pink Arrows player 1", { exact: true })
-    .selectOption("demo-pink-3");
+  await pick(
+    first.getByLabel("Pink Arrows player 1", { exact: true }),
+    "Pink Player 3",
+  );
   await expect(
     first.getByLabel("Double 1s", { exact: true }).first(),
   ).toHaveValue("0");
@@ -107,7 +115,10 @@ test("All 12 manually completed games reach review with the right total", async 
         name: new RegExp(`^${team} player`),
       });
       for (let i = 0; i < (await selects.count()); i++)
-        await selects.nth(i).selectOption(`demo-${id}-${i + 1}`);
+        await pick(
+          selects.nth(i),
+          `${id[0].toUpperCase() + id.slice(1)} Player ${i + 1}`,
+        );
     }
   }
   await expect(page.getByText(/12 of 12 games complete/)).toBeVisible();
@@ -123,5 +134,5 @@ test("All 12 manually completed games reach review with the right total", async 
     page
       .getByRole("region", { name: "Game 1", exact: true })
       .getByLabel("Pink Arrows player 1", { exact: true }),
-  ).toHaveValue("demo-pink-1");
+  ).toHaveValue("Pink Player 1");
 });
