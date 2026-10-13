@@ -16,6 +16,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toPng } from "html-to-image";
+import SheetScanner from "@/components/sheet-scanner";
+import { fillEmptyGames } from "@/lib/scan-sheet";
 import { supabase } from "@/lib/supabase";
 import { demoFixtures, demoResults } from "@/lib/demo";
 import { gameTypes, standings, type Result } from "@/lib/standings";
@@ -336,6 +338,7 @@ export default function Workspace() {
   }
   function chooseFixture(id: string) {
     setFixtureId(id);
+    setFile(null);
     setSheetId(null);
     setReview(false);
     const f = fixtures.find((f) => f.id === id);
@@ -388,7 +391,7 @@ export default function Workspace() {
         );
       setSheetId(row.data.id);
       setMessage(
-        "Original photograph securely archived. Enter all games manually, then review.",
+        "Original photograph securely archived. Scan for suggestions or enter the games manually, then review.",
       );
       await load();
     } catch (e) {
@@ -525,9 +528,7 @@ export default function Workspace() {
         <p className="muted">Chelmsford City Ladies Darts League</p>
         <div className="card">
           <h2>Committee sign in</h2>
-          <p className="muted">
-            Sign in with the shared committee account.
-          </p>
+          <p className="muted">Sign in with the shared committee account.</p>
           {client ? (
             <form onSubmit={login}>
               <label>
@@ -981,8 +982,8 @@ export default function Workspace() {
                 <div className="card">
                   <h2>2. Keep the original sheet</h2>
                   <p className="muted">
-                    Take a photo or upload a clear image. Automatic scanning is
-                    not implemented; enter the details manually below.
+                    Take a photo or upload a clear image. Try the free scanner
+                    for suggestions, or enter the details manually below.
                   </p>
                   <label>
                     Original photograph (JPEG, PNG or WebP, up to 10 MB)
@@ -990,7 +991,11 @@ export default function Workspace() {
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       capture="environment"
-                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                      onChange={(e) => {
+                        setFile(e.target.files?.[0] ?? null);
+                        setSheetId(null);
+                        setReview(false);
+                      }}
                     />
                   </label>
                   {preview && (
@@ -1015,6 +1020,33 @@ export default function Workspace() {
                     )}
                   </div>
                 </div>
+                {file && (
+                  <div className="card">
+                    <SheetScanner
+                      key={`${fixtureId}:${file.name}:${file.lastModified}`}
+                      file={file}
+                      roster={players
+                        .filter(
+                          (p) =>
+                            p.team_id === selected.home_team_id ||
+                            p.team_id === selected.away_team_id,
+                        )
+                        .map((p) => ({
+                          id: p.id,
+                          name: p.name,
+                          side:
+                            p.team_id === selected.home_team_id
+                              ? ("home" as const)
+                              : ("away" as const),
+                        }))}
+                      counts={games.map((g) => g.players.length / 2)}
+                      onApply={(suggestions) => {
+                        setGames((gs) => fillEmptyGames(gs, suggestions));
+                        setReview(false);
+                      }}
+                    />
+                  </div>
+                )}
                 <div className="card">
                   <h2>
                     3.{" "}

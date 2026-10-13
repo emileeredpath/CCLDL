@@ -447,4 +447,27 @@ input[type="file"] {
   }
 }
 /* Let wide tables scroll inside their cards rather than stretch the phone layout. */
-.grid > *, .summary > *, .fields > *, .game-fields > * { min-width: 0; }
+.grid > *,
+.summary > *,
+.fields > *,
+.game-fields > * {
+  min-width: 0;
+}
+.scan-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 0;
+  line-height: 1.6;
+}
+.scan-confirm input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.scanner summary {
+  cursor: pointer;
+  color: var(--pink);
+  padding: 16px 0;
+}

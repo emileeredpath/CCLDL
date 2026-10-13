@@ -11,15 +11,16 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "npm start -- --port 3000",
+      command:
+        "NEXT_PUBLIC_SUPABASE_URL= NEXT_PUBLIC_SUPABASE_ANON_KEY= NEXT_PUBLIC_DEMO_MODE=false CCLDL_DIST_DIR=.next-test npm run build && CCLDL_DIST_DIR=.next-test npm start -- --port 3000",
       url: "http://127.0.0.1:3000",
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
     },
     {
       command:
         "NEXT_PUBLIC_DEMO_MODE=true CCLDL_DIST_DIR=.next-demo npm run build && CCLDL_DIST_DIR=.next-demo npm start -- --port 3001",
       url: "http://127.0.0.1:3001",
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
     },
   ],
   workers: 1,

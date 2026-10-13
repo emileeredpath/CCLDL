@@ -7,3 +7,6 @@ backups/
 test-results/
 playwright-report/
 .next-demo/
+
+public/ocr/
+.next-test/
