@@ -761,3 +761,62 @@ input[type="file"] {
   overflow: hidden;
   margin-top: 16px;
 }
+
+.summary-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.inline-player-create {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.inline-player-create select {
+  min-height: 44px;
+}
+.fixture-link {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  gap: 16px;
+}
+.fixture-link:hover {
+  background: #fff2f7;
+}
+.fixture-link:focus-visible {
+  outline: 2px solid var(--pink);
+}
+.fixture-link > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--pink);
+}
+.match-score {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--pink);
+  margin: 16px 0;
+}
+
+.match-summary table {
+  table-layout: fixed;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.match-summary th:first-child {
+  width: 40%;
+}
+.match-summary th,
+.match-summary td {
+  padding: 12px 6px;
+}

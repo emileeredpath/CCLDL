@@ -1,6 +1,7 @@
 "use client";
+import { useState } from "react";
 import PlayerPicker from "./player-picker";
-import { categories, type Summary } from "@/lib/result-summary";
+import { categories, resolvePending, type Summary } from "@/lib/result-summary";
 export default function SummaryEntry({
   value,
   onChange,
@@ -9,6 +10,7 @@ export default function SummaryEntry({
   away,
   players,
   readOnly = false,
+  createPlayer,
 }: {
   value: Summary;
   onChange: (v: Summary) => void;
@@ -17,14 +19,22 @@ export default function SummaryEntry({
   away: string;
   players: { id: string; name: string; side: "home" | "away" }[];
   readOnly?: boolean;
+  createPlayer?: (
+    name: string,
+    side: "home" | "away",
+  ) => Promise<{ id: string; name: string; side: "home" | "away" }>;
 }) {
+  const [savingPlayer, setSavingPlayer] = useState(false);
+  const [rowKeys, setRowKeys] = useState(() =>
+    value.achievements.map(() => crypto.randomUUID()),
+  );
   const complete = categories(cup).every(([k]) => value.counts[k] !== null);
   const total = Object.values(value.counts).reduce<number>(
     (a, b) => a + (b ?? 0),
     0,
   );
   return (
-    <>
+    <fieldset disabled={savingPlayer} className="summary-fieldset">
       <p className="muted">
         Enter games won by {home}. {away} totals fill in automatically.
       </p>
@@ -81,8 +91,62 @@ export default function SummaryEntry({
         Only add players with Double 1s, a highest score or a highest checkout.
         Leave unused boxes blank.
       </p>
+      {value.notes && <p className="notice">{value.notes}</p>}
+      {value.pending_achievements?.map((pending, index) => (
+        <div className="notice" key={`${pending.name}:${index}`}>
+          <strong>Player to confirm: {pending.name}</strong>
+          <p>
+            {pending.note} · {pending.side === "home" ? home : away} ·{" "}
+            {pending.double_ones} Double 1s
+          </p>
+          {!readOnly && (
+            <PlayerPicker
+              label={`Resolve ${pending.name}`}
+              initialQuery={pending.name}
+              value=""
+              teamNames={{ home, away }}
+              options={players.filter((p) => p.side === pending.side)}
+              onChange={(id) => {
+                if (!id) return;
+                const player = players.find((p) => p.id === id);
+                if (!player) return;
+                setRowKeys((keys) =>
+                  value.achievements.some((p) => p.player_id === id)
+                    ? keys
+                    : [...keys, crypto.randomUUID()],
+                );
+                onChange(resolvePending(value, index, id, player.side));
+              }}
+              onCreate={
+                createPlayer
+                  ? async (name, side) => {
+                      if (side !== pending.side)
+                        throw new Error(
+                          "Choose the team recorded on the sheet.",
+                        );
+                      setSavingPlayer(true);
+                      try {
+                        const player = await createPlayer(name, side);
+                        setRowKeys((keys) =>
+                          value.achievements.some(
+                            (p) => p.player_id === player.id,
+                          )
+                            ? keys
+                            : [...keys, crypto.randomUUID()],
+                        );
+                        onChange(resolvePending(value, index, player.id, side));
+                      } finally {
+                        setSavingPlayer(false);
+                      }
+                    }
+                  : undefined
+              }
+            />
+          )}
+        </div>
+      ))}
       {value.achievements.map((p, i) => (
-        <div className="achievement" key={i}>
+        <div className="achievement" key={rowKeys[i] ?? i}>
           {readOnly ? (
             <strong>
               {players.find((x) => x.id === p.player_id)?.name} ·{" "}
@@ -92,6 +156,35 @@ export default function SummaryEntry({
             <PlayerPicker
               label={`Achievement player ${i + 1}`}
               value={p.player_id}
+              teamNames={{ home, away }}
+              onCreate={
+                createPlayer
+                  ? async (name, side) => {
+                      setSavingPlayer(true);
+                      try {
+                        const saved = await createPlayer(name, side);
+                        if (
+                          value.achievements.some(
+                            (a, j) => j !== i && a.player_id === saved.id,
+                          )
+                        )
+                          throw new Error(
+                            "This player already has an achievement row. Use that row instead.",
+                          );
+                        onChange({
+                          ...value,
+                          achievements: value.achievements.map((a, j) =>
+                            j === i
+                              ? { ...a, player_id: saved.id, side: saved.side }
+                              : a,
+                          ),
+                        });
+                      } finally {
+                        setSavingPlayer(false);
+                      }
+                    }
+                  : undefined
+              }
               options={players
                 .filter(
                   (x) =>
@@ -111,9 +204,11 @@ export default function SummaryEntry({
                           player_id: id,
                           side:
                             players.find((x) => x.id === id)?.side ?? "home",
-                          double_ones: 0,
-                          highest_score: null,
-                          highest_checkout: null,
+                          double_ones: a.player_id ? 0 : a.double_ones,
+                          highest_score: a.player_id ? null : a.highest_score,
+                          highest_checkout: a.player_id
+                            ? null
+                            : a.highest_checkout,
                         }
                       : a,
                   ),
@@ -159,12 +254,13 @@ export default function SummaryEntry({
           {!readOnly && (
             <button
               className="secondary"
-              onClick={() =>
+              onClick={() => {
+                setRowKeys((keys) => keys.filter((_, j) => j !== i));
                 onChange({
                   ...value,
                   achievements: value.achievements.filter((_, j) => j !== i),
-                })
-              }
+                });
+              }}
             >
               Remove player
             </button>
@@ -174,7 +270,8 @@ export default function SummaryEntry({
       {!readOnly && (
         <button
           className="secondary"
-          onClick={() =>
+          onClick={() => {
+            setRowKeys((keys) => [...keys, crypto.randomUUID()]);
             onChange({
               ...value,
               achievements: [
@@ -187,8 +284,8 @@ export default function SummaryEntry({
                   highest_checkout: null,
                 },
               ],
-            })
-          }
+            });
+          }}
         >
           + Add player achievement
         </button>
@@ -196,6 +293,6 @@ export default function SummaryEntry({
       {readOnly && !value.achievements.length && (
         <p>No player achievements recorded.</p>
       )}
-    </>
+    </fieldset>
   );
 }

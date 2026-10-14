@@ -1,6 +1,7 @@
 export type Result = {
   id: string;
   fixtureId?: string;
+  achievements?: import("./manual-entry").EntryPlayer[];
   breakdown?: Record<string, number>;
   summary?: import("./result-summary").Summary;
   season: string;

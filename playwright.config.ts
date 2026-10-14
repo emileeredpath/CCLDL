@@ -22,6 +22,12 @@ export default defineConfig({
       url: "http://127.0.0.1:3001",
       reuseExistingServer: false,
     },
+    {
+      command:
+        "NEXT_PUBLIC_SUPABASE_URL=https://league-test.invalid NEXT_PUBLIC_SUPABASE_ANON_KEY=test-publishable-key NEXT_PUBLIC_DEMO_MODE=false CCLDL_DIST_DIR=.next-auth-test npm run build && CCLDL_DIST_DIR=.next-auth-test npm start -- --port 3002",
+      url: "http://127.0.0.1:3002",
+      reuseExistingServer: false,
+    },
   ],
   workers: 1,
 });

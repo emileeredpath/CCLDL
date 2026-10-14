@@ -20,6 +20,7 @@ await db.exec(
 for (const name of [
   "202610130001_initial.sql",
   "202610130002_summary_results.sql",
+  "202610140001_pending_achievements.sql",
 ])
   await db.exec(
     fs.readFileSync(
@@ -138,15 +139,13 @@ const games = Array.from({ length: 12 }, (_, i) => {
     kind,
     winner: i < 7 ? "home" : "away",
     players: ["home", "away"].flatMap((side) =>
-      rosters[side]
-        .slice(0, n)
-        .map((player_id) => ({
-          player_id,
-          side,
-          double_ones: 0,
-          highest_score: null,
-          highest_checkout: null,
-        })),
+      rosters[side].slice(0, n).map((player_id) => ({
+        player_id,
+        side,
+        double_ones: 0,
+        highest_score: null,
+        highest_checkout: null,
+      })),
     ),
   };
 });
@@ -194,6 +193,64 @@ await assert.rejects(
     cupSheet,
     JSON.stringify(summary),
   ]),
+);
+
+const draftFixture = (
+  await db.query(
+    `insert into fixtures(season_id,competition,played_on,home_team_id,away_team_id) select id,'league','2026-10-20','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000003' from seasons returning id`,
+  )
+).rows[0].id;
+const pending = {
+  ...summary,
+  pending_achievements: [
+    {
+      name: "Unconfirmed",
+      side: "away",
+      double_ones: 1,
+      highest_score: null,
+      highest_checkout: null,
+      note: "Check surname",
+    },
+  ],
+};
+await db.query("select save_summary_draft($1,null,$2)", [
+  draftFixture,
+  JSON.stringify(pending),
+]);
+assert.equal(
+  (
+    await db.query("select status from results where fixture_id=$1", [
+      draftFixture,
+    ])
+  ).rows[0].status,
+  "draft",
+);
+const draftSheet = (
+  await db.query(
+    `insert into result_sheets(fixture_id,storage_path) values($1,'private/draft.jpg') returning id`,
+    [draftFixture],
+  )
+).rows[0].id;
+await assert.rejects(
+  db.query("select save_summary_result($1,$2,$3)", [
+    draftFixture,
+    draftSheet,
+    JSON.stringify(pending),
+  ]),
+  /pending achievement/,
+);
+await db.query("select save_summary_result($1,$2,$3)", [
+  draftFixture,
+  draftSheet,
+  JSON.stringify(summary),
+]);
+await assert.rejects(
+  db.query("select save_summary_draft($1,$2,$3)", [
+    draftFixture,
+    draftSheet,
+    JSON.stringify(summary),
+  ]),
+  /already approved/,
 );
 // Exercise the authenticated non-committee role against the actual RLS policies.
 await db.exec(

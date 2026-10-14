@@ -31,7 +31,10 @@ test("Summary entry requires all categories, checks achievements and calculates 
     .getByRole("button", { name: "+ Add player achievement", exact: true })
     .click();
   await expect(review).toBeDisabled();
-  const input = page.getByRole("combobox", { name: "Achievement player 1" });
+  const input = page.getByRole("combobox", {
+    name: "Achievement player 1",
+    exact: true,
+  });
   await input.fill("Pink Player 1");
   await input.press("ArrowDown");
   await input.press("Enter");

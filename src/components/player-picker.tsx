@@ -6,15 +6,24 @@ export default function PlayerPicker({
   value,
   options,
   onChange,
+  onCreate,
+  teamNames,
+  initialQuery = "",
 }: {
   label: string;
   value: string;
   options: Player[];
   onChange: (id: string) => void;
+  onCreate?: (name: string, side: "home" | "away") => Promise<void>;
+  teamNames?: { home: string; away: string };
+  initialQuery?: string;
 }) {
   const id = useId();
+  const [side, setSide] = useState<"" | "home" | "away">("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const selected = options.find((p) => p.id === value);
-  const [query, setQuery] = useState(selected?.name ?? "");
+  const [query, setQuery] = useState(selected?.name ?? initialQuery);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const last = useRef(value);
@@ -103,16 +112,64 @@ export default function PlayerPicker({
           ))}
           {!matches.length && (
             <li className="muted">
-              No matching players for this team. Add them in Fixtures or import
-              a CSV.
+              No matching players. Add a new player below, or use More → Teams &
+              players.
             </li>
           )}
         </ul>
       )}
       {query && !value && (
         <span className="muted" style={{ fontSize: 11 }}>
-          Choose a saved player from the suggestions.
+          {onCreate
+            ? "Choose a suggestion, or add this name to a team below."
+            : "Choose a saved player from the suggestions."}
         </span>
+      )}
+      {onCreate && teamNames && query.trim() && !value && (
+        <div className="inline-player-create">
+          <label>
+            New player's team
+            <select
+              aria-label={`${label} new team`}
+              value={side}
+              disabled={saving}
+              onChange={(e) => setSide(e.target.value as "home" | "away" | "")}
+            >
+              <option value="">Choose team</option>
+              <option value="home">{teamNames.home}</option>
+              <option value="away">{teamNames.away}</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="secondary"
+            disabled={!side || saving || query.trim().length > 100}
+            onClick={async () => {
+              if (!side) return;
+              setSaving(true);
+              setOpen(false);
+              setError("");
+              try {
+                await onCreate(query.trim(), side);
+              } catch (e) {
+                setError(
+                  e instanceof Error
+                    ? e.message
+                    : "Could not save player. Please try again.",
+                );
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? "Saving player…" : "Add player to team"}
+          </button>
+          {error && (
+            <p role="alert" className="notice">
+              {error}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

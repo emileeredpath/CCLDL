@@ -17,7 +17,9 @@ import {
   Users,
 } from "lucide-react";
 import { toPng } from "html-to-image";
+import { normalise } from "@/lib/player-csv";
 import PlayerCsvImport from "@/components/player-csv-import";
+import MatchSummary from "@/components/match-summary";
 import PosterPreview from "@/components/poster-preview";
 import WeeklyPoster from "@/components/weekly-poster";
 import SummaryEntry from "@/components/summary-entry";
@@ -36,6 +38,7 @@ import { gameTypes, standings, type Result } from "@/lib/standings";
 const client = supabase();
 const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 type Screen =
+  | "Match summary"
   | "Home"
   | "Fixtures"
   | "Add Result"
@@ -188,6 +191,7 @@ export default function Workspace() {
   const [week, setWeek] = useState(new Date().toISOString().slice(0, 10));
   const [teamFilter, setTeamFilter] = useState("");
   const [archiveDate, setArchiveDate] = useState("");
+  const [viewedFixtureId, setViewedFixtureId] = useState("");
   const [fixtureId, setFixtureId] = useState("");
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -259,6 +263,26 @@ export default function Workspace() {
           home: f?.home ?? "",
           away: f?.away ?? "",
           summary: r.summary,
+          achievements: Object.values(
+            r.games
+              .flatMap((g: { game_players: PlayerEntry[] }) => g.game_players)
+              .reduce((acc: Record<string, PlayerEntry>, p: PlayerEntry) => {
+                const old = acc[p.player_id];
+                acc[p.player_id] = {
+                  ...p,
+                  double_ones: (old?.double_ones ?? 0) + p.double_ones,
+                  highest_score:
+                    Math.max(old?.highest_score ?? 0, p.highest_score ?? 0) ||
+                    null,
+                  highest_checkout:
+                    Math.max(
+                      old?.highest_checkout ?? 0,
+                      p.highest_checkout ?? 0,
+                    ) || null,
+                };
+                return acc;
+              }, {}),
+          ) as PlayerEntry[],
           fixtureId: r.fixture_id,
           breakdown:
             r.summary?.counts ??
@@ -386,6 +410,7 @@ export default function Workspace() {
   }
   function chooseFixture(id: string) {
     setFixtureId(id);
+    setArchivePreview("");
     setDetailed(false);
     setSummary(
       emptySummary(fixtures.find((f) => f.id === id)?.competition === "cup"),
@@ -416,7 +441,7 @@ export default function Workspace() {
     );
   }
   async function upload() {
-    if (!client || !file || !selected) return;
+    if (!client || !file || !selected) return null;
     setBusy(true);
     setMessage("");
     try {
@@ -446,8 +471,83 @@ export default function Workspace() {
         "Original photograph saved. Enter the totals and any player achievements, then review.",
       );
       await load();
+      return row.data.id as string;
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Upload failed");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function createResultPlayer(name: string, side: "home" | "away") {
+    if (!client || demo || !selected)
+      throw new Error("Player saving is unavailable in the demonstration.");
+    const teamId =
+      side === "home" ? selected.home_team_id : selected.away_team_id;
+    const clean = name.normalize("NFKC").trim().replace(/\s+/g, " ");
+    if (!teamId || !clean || clean.length > 100 || /[\x00-\x1f]/.test(clean))
+      throw new Error("Enter a valid player name and choose a match team.");
+    setBusy(true);
+    try {
+      const current = await client
+        .from("players")
+        .select("id,name,team_id")
+        .eq("team_id", teamId);
+      if (current.error) throw new Error(current.error.message);
+      const matches = (current.data ?? []).filter(
+        (p) => normalise(p.name) === normalise(clean),
+      );
+      if (matches.length > 1)
+        throw new Error(
+          "More than one saved player has this name. Choose the correct existing player instead.",
+        );
+      let saved = matches[0];
+      if (!saved) {
+        const inserted = await client
+          .from("players")
+          .insert({ name: clean, team_id: teamId })
+          .select("id,name,team_id")
+          .single();
+        if (inserted.error) throw new Error(inserted.error.message);
+        saved = inserted.data;
+      }
+      setPlayers((ps) => [...ps.filter((p) => p.id !== saved.id), saved]);
+      return { ...saved, side };
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveDraft() {
+    if (!client || !selected || demo) return;
+    setBusy(true);
+    try {
+      let savedSheet = sheetId;
+      if (!savedSheet && file) {
+        savedSheet = await upload();
+        if (!savedSheet) return;
+        setBusy(true);
+      }
+      const { error } = await client.rpc("save_summary_draft", {
+        p_fixture: selected.id,
+        p_sheet: savedSheet,
+        p_summary: summary,
+      });
+      if (error)
+        throw new Error(
+          error.code === "PGRST202"
+            ? "Draft saving needs the latest database update. Your entries are still here."
+            : error.message,
+        );
+      await load();
+      setMessage(
+        "Draft saved to the league database. You can finish it from Fixtures later. It is not included in standings until approved.",
+      );
+    } catch (e) {
+      setMessage(
+        e instanceof Error
+          ? e.message
+          : "Draft could not be saved. Your entries are still here.",
+      );
     } finally {
       setBusy(false);
     }
@@ -456,22 +556,42 @@ export default function Workspace() {
     if (!client || !selected) return;
     setBusy(true);
     try {
+      let savedSheet = sheetId;
+      if (!savedSheet && file) {
+        savedSheet = await upload();
+        if (!savedSheet) return;
+        setBusy(true);
+      }
       const { error } = await client.rpc(
         detailed ? "save_result" : "save_summary_result",
         detailed
           ? {
               p_fixture: selected.id,
-              p_sheet: sheetId,
+              p_sheet: savedSheet,
               p_games: games,
               p_approve: true,
             }
-          : { p_fixture: selected.id, p_sheet: sheetId, p_summary: summary },
+          : { p_fixture: selected.id, p_sheet: savedSheet, p_summary: summary },
       );
       if (error) throw error;
-      setMessage("Result approved. Tables and statistics have been refreshed.");
+      const verification = await client
+        .from("results")
+        .select("id,status")
+        .eq("fixture_id", selected.id)
+        .single();
+      if (verification.error || verification.data?.status !== "approved") {
+        setMessage(
+          "Your save was accepted, but we couldn't confirm it by reloading. Check Results before saving again.",
+        );
+        return;
+      }
       setReview(false);
       await load();
-      setScreen("Tables");
+      setMessage(
+        "Saved successfully. Your result and player achievements are stored in the league database.",
+      );
+      setViewedFixtureId(selected.id);
+      setScreen("Match summary");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -562,6 +682,7 @@ export default function Workspace() {
     : summaryValid(summary, selected?.competition === "cup");
   const navigate = (name: Screen) => {
     setScreen(name);
+    setArchivePreview("");
     setMessage("");
   };
   if (!ready)
@@ -931,6 +1052,60 @@ export default function Workspace() {
             </button>
           </>
         )}
+        {screen === "Match summary" &&
+          (() => {
+            const f = fixtures.find((x) => x.id === viewedFixtureId);
+            const r = results.find(
+              (x) =>
+                x.fixtureId === viewedFixtureId ||
+                (f &&
+                  x.home === f.home &&
+                  x.away === f.away &&
+                  x.date === f.date &&
+                  x.competition === f.competition),
+            );
+            return f ? (
+              <>
+                <button
+                  className="secondary"
+                  onClick={() => navigate("Fixtures")}
+                >
+                  Back to fixtures
+                </button>
+                <MatchSummary
+                  fixture={f}
+                  result={r}
+                  players={players}
+                  disabled={demo || busy}
+                  photos={sheets.filter((s) => s.fixture_id === f.id)}
+                  onPhoto={(id) => {
+                    const sheet = sheets.find((s) => s.id === id);
+                    if (sheet) void openSheet(sheet);
+                  }}
+                  onEdit={() => {
+                    if (r) void editResult(r.id);
+                    else {
+                      chooseFixture(f.id);
+                      setScreen("Add Result");
+                    }
+                  }}
+                />
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    chooseFixture("");
+                    navigate("Add Result");
+                  }}
+                >
+                  Add another result
+                </button>
+              </>
+            ) : (
+              <p className="notice">
+                Fixture unavailable. Return to Fixtures and refresh.
+              </p>
+            );
+          })()}
         {screen === "Fixtures" && (
           <>
             <div className="card">
@@ -946,15 +1121,37 @@ export default function Workspace() {
                 )
                 .sort((a, b) => a.date.localeCompare(b.date))
                 .map((f) => {
+                  const saved = results.find(
+                    (r) =>
+                      r.fixtureId === f.id ||
+                      (r.home === f.home &&
+                        r.away === f.away &&
+                        r.date === f.date &&
+                        r.competition === f.competition),
+                  );
                   return (
-                    <div className="result-row" key={f.id}>
+                    <button
+                      type="button"
+                      className="fixture-link result-row"
+                      key={f.id}
+                      onClick={() => {
+                        setViewedFixtureId(f.id);
+                        navigate("Match summary");
+                      }}
+                    >
                       <div>
                         <span className="eyebrow">{dateLabel(f.date)}</span>
                         <h3>
                           {f.home} vs {f.away}
                         </h3>
                       </div>
-                    </div>
+                      <span>
+                        {saved
+                          ? `${saved.homeWins} – ${saved.awayWins}${saved.approved ? "" : " · Draft"}`
+                          : "View match"}{" "}
+                        <ChevronRight size={16} />
+                      </span>
+                    </button>
                   );
                 })}
               {!fixtures.length && (
@@ -1062,6 +1259,8 @@ export default function Workspace() {
                         : "3. Scores & achievements"}
                     </h2>
                     <SummaryEntry
+                      key={fixtureId}
+                      createPlayer={createResultPlayer}
                       value={summary}
                       onChange={setSummary}
                       cup={selected.competition === "cup"}
@@ -1083,6 +1282,25 @@ export default function Workspace() {
                         }))}
                     />
                     <div className="actions">
+                      {!review &&
+                        !results.some(
+                          (r) => r.fixtureId === fixtureId && r.approved,
+                        ) && (
+                          <button
+                            className="secondary"
+                            disabled={
+                              demo ||
+                              busy ||
+                              !summaryValid(
+                                { ...summary, pending_achievements: [] },
+                                selected.competition === "cup",
+                              )
+                            }
+                            onClick={saveDraft}
+                          >
+                            Save draft
+                          </button>
+                        )}
                       {review ? (
                         <>
                           <button
@@ -1097,7 +1315,7 @@ export default function Workspace() {
                               demo ||
                               busy ||
                               !formComplete ||
-                              !sheetId ||
+                              (!sheetId && !file) ||
                               !summaryReady
                             }
                             onClick={approve}
@@ -1117,7 +1335,8 @@ export default function Workspace() {
                     </div>
                     {!sheetId && (
                       <p className="muted">
-                        Save the original photograph before approving.
+                        Choose the original photo above. It will be saved when
+                        you approve.
                       </p>
                     )}
                   </div>
@@ -1175,7 +1394,12 @@ export default function Workspace() {
                           </button>
                           <button
                             className="primary"
-                            disabled={demo || busy || !formComplete || !sheetId}
+                            disabled={
+                              demo ||
+                              busy ||
+                              !formComplete ||
+                              (!sheetId && !file)
+                            }
                             onClick={approve}
                           >
                             Approve & save result
@@ -1297,9 +1521,14 @@ export default function Workspace() {
                       <button
                         className="secondary"
                         disabled={demo || busy}
-                        onClick={() => editResult(r.id)}
+                        onClick={() => {
+                          if (r.fixtureId) {
+                            setViewedFixtureId(r.fixtureId);
+                            navigate("Match summary");
+                          }
+                        }}
                       >
-                        View / edit result
+                        View match summary
                       </button>
                       {sheets
                         .filter((s) => s.fixture_id === r.fixtureId)
@@ -1362,39 +1591,36 @@ export default function Workspace() {
                   </div>
                 )}
             </div>
-            {archivePreview && (
-              <div className="card">
-                <h2>Original photograph</h2>
-                <img
-                  className="sheet-preview"
-                  src={archivePreview}
-                  alt="Archived original result sheet"
-                />
-                <p className="muted">
-                  Private link expires after 60 seconds. Reopen the sheet to
-                  refresh.
-                </p>
-                <h3>Fixture & result edit history</h3>
-                {history.length ? (
-                  history.map((h, i) => (
-                    <p className="muted" key={i}>
-                      {h}
-                    </p>
-                  ))
-                ) : (
-                  <p className="muted">
-                    No fixture or result corrections recorded.
-                  </p>
-                )}
-                <button
-                  className="secondary"
-                  onClick={() => setArchivePreview("")}
-                >
-                  Close
-                </button>
-              </div>
-            )}
           </>
+        )}
+        {archivePreview && (
+          <div className="card">
+            <h2>Original photograph</h2>
+            <img
+              className="sheet-preview"
+              src={archivePreview}
+              alt="Archived original result sheet"
+            />
+            <p className="muted">
+              Private link expires after 60 seconds. Reopen the sheet to
+              refresh.
+            </p>
+            <h3>Fixture & result edit history</h3>
+            {history.length ? (
+              history.map((h, i) => (
+                <p className="muted" key={i}>
+                  {h}
+                </p>
+              ))
+            ) : (
+              <p className="muted">
+                No fixture or result corrections recorded.
+              </p>
+            )}
+            <button className="secondary" onClick={() => setArchivePreview("")}>
+              Close
+            </button>
+          </div>
         )}
         {screen === "Weekly Overview" && (
           <>
@@ -1537,6 +1763,7 @@ export default function Workspace() {
             key={name}
             className={
               screen === name ||
+              (name === "Fixtures" && screen === "Match summary") ||
               (name === "More" &&
                 ["Results", "Weekly Overview", "Teams & players"].includes(
                   screen,

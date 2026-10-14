@@ -2,6 +2,11 @@ import type { EntryPlayer } from "./manual-entry";
 export type Summary = {
   counts: Record<string, number | null>;
   achievements: EntryPlayer[];
+  notes?: string;
+  pending_achievements?: (Omit<EntryPlayer, "player_id"> & {
+    name: string;
+    note: string;
+  })[];
 };
 export const categories = (cup: boolean) =>
   cup
@@ -18,6 +23,7 @@ export const emptySummary = (cup: boolean): Summary => ({
 });
 export function summaryValid(s: Summary, cup: boolean) {
   return (
+    !s.pending_achievements?.length &&
     categories(cup).every(
       ([k, max]) =>
         Number.isInteger(s.counts[k]) &&
@@ -70,4 +76,39 @@ export function categoryStandings(
   return [...totals]
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+}
+
+export function resolvePending(
+  summary: Summary,
+  index: number,
+  playerId: string,
+  side: "home" | "away",
+): Summary {
+  const pending = summary.pending_achievements?.[index];
+  if (!pending || !playerId || pending.side !== side)
+    throw new Error("Choose a player from the recorded team.");
+  const existing = summary.achievements.find((p) => p.player_id === playerId);
+  const entry: EntryPlayer = {
+    player_id: playerId,
+    side,
+    double_ones: (existing?.double_ones ?? 0) + pending.double_ones,
+    highest_score:
+      Math.max(existing?.highest_score ?? 0, pending.highest_score ?? 0) ||
+      null,
+    highest_checkout:
+      Math.max(
+        existing?.highest_checkout ?? 0,
+        pending.highest_checkout ?? 0,
+      ) || null,
+  };
+  return {
+    ...summary,
+    achievements: [
+      ...summary.achievements.filter((p) => p.player_id !== playerId),
+      entry,
+    ],
+    pending_achievements: summary.pending_achievements!.filter(
+      (_, i) => i !== index,
+    ),
+  };
 }

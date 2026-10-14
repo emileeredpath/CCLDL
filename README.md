@@ -27,7 +27,7 @@ Use the existing checkout in each isolated cloud task; no Git worktree is needed
 
 Use an existing project or approve creating one first. Do not paste credentials in chat or commit `.env.local`.
 
-1. For a new database, apply both files in `supabase/migrations/` in order. For an existing installation, apply only `202610130002_summary_results.sql`. The initial migration `supabase/migrations/202610130001_initial.sql` is run once through the Supabase CLI (`supabase db push` after linking) or SQL editor. It creates only the confirmed 2026/27 season, **no teams, players, results or user accounts**. Review actual season dates before use; the initial season record uses September–August boundaries, which can be adjusted by the committee.
+1. For a new database, apply all files in `supabase/migrations/` in order. For an existing installation, apply only migrations not yet applied; the latest is `202610140001_pending_achievements.sql` (draft saving and unresolved achievement protection). The initial migration `supabase/migrations/202610130001_initial.sql` is run once through the Supabase CLI (`supabase db push` after linking) or SQL editor. It creates only the confirmed 2026/27 season, **no teams, players, results or user accounts**. Review actual season dates before use; the initial season record uses September–August boundaries, which can be adjusted by the committee.
 2. In Authentication settings, **disable Allow new users to sign up** and anonymous sign-ins. Password sign-in is supported; no registration form exists. Configure strong passwords and MFA for the committee in Supabase where available. MFA enforcement in the app is a later task.
 3. Create one shared committee user securely in the dashboard. Insert its user ID into `public.committee_members` using SQL editor. Membership cannot be granted or altered by browser clients:
 
@@ -74,8 +74,8 @@ Use Supabase's supported backup/export features for your selected plan; do not a
 
 ## Validation performed in this cloud workspace
 
-- Production build and 14 unit tests passed (standings, detailed-entry helpers, summary scores and CSV parsing).
-- 6 Chromium browser tests passed: locked production screen, summary entry and CSV review at phone widths, searchable players, consolidated navigation, a real PNG download, desktop dashboard and PWA assets.
+- Production build and 15 unit tests passed (standings, detailed-entry helpers, summary scores and CSV parsing).
+- 7 Chromium browser tests passed: locked production screen, summary entry and CSV review at phone widths, searchable players, consolidated navigation, a real PNG download, desktop dashboard and PWA assets. The authenticated write-flow test intercepts a dedicated fake Supabase host; it checks request payloads, failure recovery, draft/reopen, photo upload during approval, saved confirmation, summaries after reload and pending-player resolution without writing live records.
 - PostgreSQL 17 migration and SQL acceptance assertions passed using local auth/storage schema stubs: nonmember read/write denial, complete result approval, correction audit history and retention of originals. This validates SQL behavior, **not** Supabase auth/storage integration.
 - Dependency audit reported zero vulnerabilities after upgrading to Next.js 16.4.
 
@@ -85,7 +85,7 @@ Run browser checks after `npm run build`, with Supabase variables unset and demo
 npm run test:browser
 ```
 
-The tests build a separate fictional demo in `.next-demo`; neither build inserts database records. Chromium must be installed; set `CHROMIUM_PATH` if its location differs from `/usr/bin/chromium`.
+The tests build a fictional demo in `.next-demo`, an unconfigured app in `.next-test`, and an authenticated-flow test app in `.next-auth-test` with the reserved `league-test.invalid` backend fully mocked by Playwright. None writes live records. Chromium must be installed; set `CHROMIUM_PATH` if its location differs from `/usr/bin/chromium`.
 
 To reproduce SQL checks, run an isolated disposable PostgreSQL 17 instance, then apply `tests/sql/bootstrap.sql`, the migration, and `tests/sql/rls-and-results.sql` in order with `psql -v ON_ERROR_STOP=1`. These files must **never** be applied to your live Supabase project: they contain test identities and fictional records.
 
@@ -117,6 +117,17 @@ More → Teams & players shows current players grouped by team, with search. CSV
 
 Import rechecks existing teams/players immediately before sending one bulk insert through the signed-in Supabase client and existing committee RLS. It does not delete/overwrite players or automatically create teams. No migration or extra backend credential is needed. Duplicate detection is application-level; it is not a new database uniqueness constraint. CSV parsing/preview and duplicate/error handling are tested locally; the live bulk insert still needs acceptance testing with the committee account.
 
-During result entry, start typing a saved team member's name and choose a suggestion (or use arrow keys and Enter). Only players from the fixture’s two teams are offered. Players already added to the achievement list are excluded. Existing detailed results keep their earlier lineup helpers. Unrecognised/free-typed names do not count as a selected player and prevent approval until an existing player is chosen. Statistics remain attached to the selected player/result; changing the selected player clears their prior stats. The sample rosters are still confined to demo mode.
+During result entry, start typing a saved team member's name and choose a suggestion (or use arrow keys and Enter). Only players from the fixture’s two teams are offered. Players already added to the achievement list are excluded. Existing detailed results keep their earlier lineup helpers. For a new name, choose the home or away team and use **Add player to team** without leaving result entry. It rechecks the selected team for a normalised matching name before inserting; existing matches are reused. Creating/selecting a player for an unassigned achievement retains entered statistics. Changing an already selected identity clears old statistics. Creation failures keep the name and values for retry. Unrecognised/free-typed names do not count as selected until chosen or saved. Statistics remain attached to the selected player/result; changing the selected player clears their prior stats. The sample rosters are still confined to demo mode.
 
 Phone shortcut: More → Teams & players opens roster management. Input controls and player suggestions use generous tap targets; the import preview is tested at 320px width as well as the result flow at 390px. Actual iPhone/Android device acceptance remains separate from these Chromium viewport checks.
+
+
+## Saved drafts and fixture summaries
+
+Apply `202610140001_pending_achievements.sql` after the summary-results migration. It adds an authenticated committee-only `save_summary_draft` transaction, which cannot demote/overwrite an approved or detailed result, and an approval guard for unresolved achievements. The migration is safe to rerun. A complete score summary can be saved as a draft before a photograph is attached. Drafts are stored in Supabase and excluded from standings until approved. Unsaved edits are held only in memory; there is no local storage of private results.
+
+Select the photograph and review the result; approval archives a selected photo automatically if none is saved yet. The existing explicit Save photograph button remains available. Approval checks the returned database record before showing success, then opens the match summary. Select a fixture (or a result in Results) to view its totals, category wins, named achievements, approval status and linked originals. **Finish & approve result** reopens a draft without retyping its stored data; **Add another result** starts the next match.
+
+Transcribed data imports are private artifacts outside the public repository. Imports should reuse fixtures/players, preserve existing results, and create drafts with original-photo checks rather than fabricating archive objects. Unknown identities are stored in `summary.pending_achievements`; the form lets the committee resolve them against the recorded team or add a known name. Resolution preserves the finish count and merges into an existing achievement row. Approval is blocked on both client and database while unresolved entries remain. The whole-season fixture schedule must be supplied by the committee; result sheets only establish their particular matches.
+
+Inline player duplicate checks are application-level; concurrent creations in separate sessions may still need committee deduplication. Browser write tests use mocked Supabase responses, and SQL checks use disposable PostgreSQL-compatible databases. These checks do not claim a live Railway/Supabase acceptance run.

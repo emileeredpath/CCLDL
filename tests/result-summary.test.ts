@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  resolvePending,
   emptySummary,
   summaryValid,
   categoryStandings,
@@ -89,4 +90,36 @@ test("Category totals use approved league records through the cutoff only, with 
       { name: "A", value: 0 },
     ],
   );
+});
+
+test("Pending achievements block approval and merge without losing counts", () => {
+  const pending: Summary = {
+    ...summary,
+    pending_achievements: [
+      {
+        name: "Unconfirmed",
+        note: "Check name",
+        side: "home",
+        double_ones: 1,
+        highest_score: null,
+        highest_checkout: null,
+      },
+    ],
+    achievements: [
+      {
+        player_id: "known",
+        side: "home",
+        double_ones: 2,
+        highest_score: 140,
+        highest_checkout: null,
+      },
+    ],
+  };
+  assert.equal(summaryValid(pending, false), false);
+  assert.throws(() => resolvePending(pending, 0, "known", "away"));
+  const resolved = resolvePending(pending, 0, "known", "home");
+  assert.equal(resolved.achievements.length, 1);
+  assert.equal(resolved.achievements[0].double_ones, 3);
+  assert.equal(resolved.achievements[0].highest_score, 140);
+  assert.equal(summaryValid(resolved, false), true);
 });

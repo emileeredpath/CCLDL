@@ -64,7 +64,10 @@ test("Typing a name needs explicit selection and filters by team", async ({
   await page
     .getByRole("button", { name: "+ Add player achievement", exact: true })
     .click();
-  const input = page.getByRole("combobox", { name: "Achievement player 1" });
+  const input = page.getByRole("combobox", {
+    name: "Achievement player 1",
+    exact: true,
+  });
   await input.fill("Pink Player 3");
   await expect(
     page.getByRole("option", { name: "Pink Player 3 · Pink Arrows" }),
@@ -79,7 +82,5 @@ test("Typing a name needs explicit selection and filters by team", async ({
     page.getByRole("button", { name: "Review result", exact: true }),
   ).toBeDisabled();
   await input.fill("Foxes Player");
-  await expect(page.locator(".player-picker").getByRole("option")).toHaveCount(
-    0,
-  );
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(0);
 });
