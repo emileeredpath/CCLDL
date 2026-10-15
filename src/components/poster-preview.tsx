@@ -14,11 +14,14 @@ export default function PosterPreview({
   children: ReactNode;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(1800);
   const [size, setSize] = useState({ scale: 1, height: 900 });
   useEffect(() => {
     const measure = () => {
       if (!container.current || !posterRef.current) return;
-      const scale = Math.min(1, container.current.clientWidth / 1080);
+      const height = posterRef.current.offsetHeight;
+      if (height >= width) { setWidth(Math.ceil(height * 1.6)); return; }
+      const scale = Math.min(1, container.current.clientWidth / width);
       setSize({ scale, height: posterRef.current.offsetHeight * scale });
     };
     const observer = new ResizeObserver(measure);
@@ -26,7 +29,7 @@ export default function PosterPreview({
     if (posterRef.current) observer.observe(posterRef.current);
     measure();
     return () => observer.disconnect();
-  }, [posterRef]);
+  }, [posterRef, width]);
   return (
     <div
       ref={container}
@@ -37,10 +40,10 @@ export default function PosterPreview({
         style={{
           transform: `scale(${size.scale})`,
           transformOrigin: "top left",
-          width: 1080,
+          width,
         }}
       >
-        <div ref={posterRef} className="weekly-poster">
+        <div ref={posterRef} className="weekly-poster" style={{ width }}>
           {children}
         </div>
       </div>

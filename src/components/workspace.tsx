@@ -78,7 +78,7 @@ type Sheet = {
   storage_path: string;
   created_at: string;
 };
-type Stat = { name: string; d1: number; score: number; checkout: number };
+type Stat = { team?: string; name: string; d1: number; score: number; checkout: number };
 function dateLabel(date: string) {
   return new Date(date + "T12:00:00").toLocaleDateString("en-GB", {
     day: "numeric",
@@ -117,8 +117,10 @@ function Table({
   cutoff,
   season,
   breakdown = false,
+  full = false,
 }: {
   breakdown?: boolean;
+  full?: boolean;
   results: Result[];
   competition: "league" | "cup";
   cutoff: string;
@@ -135,6 +137,7 @@ function Table({
             <tr>
               <th>Team</th>
               <th>Played</th>
+              {full && <><th>Won</th><th>Drawn</th><th>Lost</th><th>Games for</th><th>Games against</th></>}
               {competition === "cup" && <th>Won</th>}
               {!breakdown && <th>Lost</th>}
               {breakdown && kinds.map((kind) => <th key={kind}>{kind}</th>)}
@@ -146,6 +149,7 @@ function Table({
               <tr key={r.team}>
                 <td style={{ fontWeight: 600 }}>{r.team}</td>
                 <td>{r.played}</td>
+                {full && <><td>{r.won}</td><td>{r.drawn}</td><td>{r.lost}</td><td>{r.gamesFor}</td><td>{r.gamesAgainst}</td></>}
                 {competition === "cup" && <td>{r.gamesFor}</td>}
                 {!breakdown && <td>{r.gamesAgainst}</td>}
                 {breakdown && kinds.map((kind, i) => <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>)}
@@ -196,6 +200,9 @@ export default function Workspace() {
   const [season, setSeason] = useState("2026/27");
   const [competition, setCompetition] = useState<"league" | "cup">("league");
   const [week, setWeek] = useState(new Date().toISOString().slice(0, 10));
+  const [fixtureSearch, setFixtureSearch] = useState("");
+  const [fixtureStatus, setFixtureStatus] = useState("all");
+  const [statTab, setStatTab] = useState<"d1" | "score" | "checkout">("d1");
   const [teamFilter, setTeamFilter] = useState("");
   const [archiveDate, setArchiveDate] = useState("");
   const [viewedFixtureId, setViewedFixtureId] = useState("");
@@ -337,6 +344,7 @@ export default function Workspace() {
         )) {
         const row = totals.get(p.player_id) ?? {
           name: ps.find((x) => x.id === p.player_id)?.name ?? "Unknown player",
+          team: ts.find((t) => t.id === ps.find((x) => x.id === p.player_id)?.team_id)?.name,
           d1: 0,
           score: 0,
           checkout: 0,
@@ -803,7 +811,7 @@ export default function Workspace() {
 
           .map((s) => (
             <div className="result-row" key={s.name}>
-              <span>{s.name}</span>
+              <span><strong>{s.name}</strong>{s.team && <small className="player-team">{s.team}</small>}</span>
               <strong className="score">{s[key]}</strong>
             </div>
           ))
@@ -1047,6 +1055,8 @@ export default function Workspace() {
             <Table
               results={results}
               competition={competition}
+              full={competition === "league"}
+              breakdown={competition === "league"}
               cutoff={week}
               season={season}
             />
@@ -1065,11 +1075,6 @@ export default function Workspace() {
             <p className="muted">
               Approved {competition} results only · through {dateLabel(week)}
             </p>
-            <div className="grid">
-              {statPanel("d1", "Most Double 1 finishes")}
-              {statPanel("checkout", "Highest checkout")}
-              {statPanel("score", "Highest score")}
-            </div>
             {competition === "league" && (
               <div className="grid">
                 {categories(false).map(([kind]) => (
@@ -1092,6 +1097,11 @@ export default function Workspace() {
                 ))}
               </div>
             )}
+            <h2>Player statistics</h2>
+            <div className="filter-pills" aria-label="Player statistic">
+              {([ ["d1", "Double 1s"], ["score", "Highest score"], ["checkout", "Highest checkout"] ] as const).map(([key, label]) => <button className={statTab === key ? "selected" : ""} aria-pressed={statTab === key} key={key} onClick={() => setStatTab(key)}>{label}</button>)}
+            </div>
+            {statPanel(statTab, statTab === "d1" ? "Double 1 finishes" : statTab === "score" ? "Highest score" : "Highest checkout")}
             <button
               className="secondary"
               disabled={!statsReady || !stats.length}
@@ -1157,58 +1167,27 @@ export default function Workspace() {
           })()}
         {screen === "Fixtures" && (
           <>
-            <div className="card">
-              <div className="card-head">
-                <h2>Fixture schedule</h2>
-                <span className="badge">{competition}</span>
+            <div className="card schedule-filters">
+              <h2>Fixtures & results</h2>
+              <label>Find a team<input value={fixtureSearch} onChange={(e) => setFixtureSearch(e.target.value)} placeholder="Search fixtures" /></label>
+              <div className="filter-pills" aria-label="Fixture status">
+                {[["all", "All fixtures"], ["approved", "Results"], ["pending", "To enter"]].map(([key,label]) => <button key={key} className={fixtureStatus === key ? "selected" : ""} aria-pressed={fixtureStatus === key} onClick={() => setFixtureStatus(key)}>{label}</button>)}
               </div>
-              {fixtures
-                .filter(
-                  (f) =>
-                    (demo || f.season === season) &&
-                    f.competition === competition,
-                )
-                .sort((a, b) => a.date.localeCompare(b.date))
-                .map((f) => {
-                  const saved = results.find(
-                    (r) =>
-                      r.fixtureId === f.id ||
-                      (r.home === f.home &&
-                        r.away === f.away &&
-                        r.date === f.date &&
-                        r.competition === f.competition),
-                  );
-                  return (
-                    <button
-                      type="button"
-                      className="fixture-link result-row"
-                      key={f.id}
-                      onClick={() => {
-                        setViewedFixtureId(f.id);
-                        navigate("Match summary");
-                      }}
-                    >
-                      <div>
-                        <span className="eyebrow">{dateLabel(f.date)}</span>
-                        <h3>
-                          {f.home} vs {f.away}
-                        </h3>
-                      </div>
-                      <span>
-                        {saved
-                          ? `${saved.homeWins} – ${saved.awayWins}${saved.approved ? "" : " · Draft"}`
-                          : "View match"}{" "}
-                        <ChevronRight size={16} />
-                      </span>
-                    </button>
-                  );
-                })}
-              {!fixtures.length && (
-                <div className="empty">
-                  No fixtures yet. Add the schedule in More → Teams & players.
-                </div>
-              )}
+              <button className="secondary" onClick={() => navigate("Teams & players")}>Add a fixture</button>
             </div>
+            {(() => {
+              const visible = fixtures.filter((f) => (demo || f.season === season) && f.competition === competition && `${f.home} ${f.away}`.toLowerCase().includes(fixtureSearch.toLowerCase()) && (fixtureStatus === "all" || (results.some((r) => r.fixtureId === f.id && r.approved) ? fixtureStatus === "approved" : fixtureStatus === "pending"))).sort((a,b) => a.date.localeCompare(b.date));
+              return visible.length ? [...new Set(visible.map((f) => f.date))].map((date) => <section className="card fixture-round" key={date}>
+                <div className="card-head"><h2>{dateLabel(date)}</h2><span className="badge">{competition === "league" ? "League" : "Cup"}</span></div>
+                {visible.filter((f) => f.date === date).map((f) => {
+                  const saved = results.find((r) => r.fixtureId === f.id || (r.home === f.home && r.away === f.away && r.date === f.date && r.competition === f.competition));
+                  return <button className="fixture-link result-row" key={f.id} onClick={() => {setViewedFixtureId(f.id); navigate("Match summary");}}>
+                    <span><strong>{f.home} vs {f.away}</strong><small className="player-team">{saved ? saved.approved ? "View result & original sheet" : "Draft · finish entering result" : "View match / add result"}</small></span>
+                    <span className="score">{saved ? `${saved.homeWins} – ${saved.awayWins}` : "View"}<ChevronRight size={16} /></span>
+                  </button>;
+                })}
+              </section>) : <p className="empty">No fixtures match these filters.</p>;
+            })()}
           </>
         )}
         {screen === "Teams & players" && (
@@ -1533,7 +1512,7 @@ export default function Workspace() {
         {screen === "Results" && (
           <>
             <div className="card">
-              <h2>Saved results & original sheets</h2>
+              <h2>Result sheet archive</h2>
               <div className="fields" style={{ marginTop: 16 }}>
                 <label>
                   Team
@@ -1564,7 +1543,7 @@ export default function Workspace() {
                 )
                 .sort((a, b) => b.date.localeCompare(a.date))
                 .map((r) => (
-                  <div className="result-row" key={r.id}>
+                  <div className="archive-match" key={r.id}>
                     <div>
                       <strong>
                         {r.home} {r.homeWins} – {r.awayWins} {r.away}

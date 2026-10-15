@@ -145,3 +145,16 @@ if the migration has not yet been applied.
 The Home league table shows points alongside pairs, trebles, singles and captains
 & vice wins, calculated from approved league results for the selected season and
 cutoff date. Cup results remain separate.
+
+### Secretary layout and weekly images
+
+Fixtures are grouped by match date with team search and result-status filters.
+Open any match to see its summary and private original sheets, or enter its result.
+Tables combines match totals and game categories, followed by category leaders and
+switchable player-statistic lists. The result archive retains team and date filters.
+
+Weekly PNGs use a landscape layout. The preview scales to phone width; the export
+retains all rows and widens for unusually long standings rather than clipping data.
+Automatic handwriting extraction remains unavailable. A future assisted scanner
+must be evaluated against representative sheets and must require review before
+saving. Do not enable a paid OCR/vision provider without committee authorization.

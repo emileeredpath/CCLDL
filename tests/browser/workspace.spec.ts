@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { test, expect } from "@playwright/test";
 test("Unconfigured production fails closed without showing league records", async ({
   page,
@@ -49,7 +50,7 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
   ).toBeDisabled();
   await nav.getByRole("button", { name: "Fixtures", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Fixture schedule" }),
+    page.getByRole("heading", { name: "Fixtures & results" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Season administration" }),
@@ -59,7 +60,7 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
   );
   await nav.getByRole("button", { name: "Tables", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Most Double 1 finishes" }),
+    page.getByRole("heading", { name: "Double 1 finishes" }),
   ).toBeVisible();
   await nav.getByRole("button", { name: "More", exact: true }).click();
   await page
@@ -80,6 +81,8 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
   await page.getByRole("button", { name: "Download PNG" }).click();
   const d = await download;
   await d.saveAs("test-results/weekly.png");
+  const png = fs.readFileSync("test-results/weekly.png");
+  expect(png.readUInt32BE(16)).toBeGreaterThan(png.readUInt32BE(20));
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

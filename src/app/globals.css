@@ -849,3 +849,15 @@ td { padding: 12px 9px; }
 
 .sheet-actions { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; }
 .remove-sheet { border: 0; background: transparent; color: #9d3159; font-size: 24px; min-width: 44px; min-height: 44px; border-left: 1px solid var(--line); }
+
+.filter-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.filter-pills button { border: 1px solid var(--line); border-radius: 24px; background: white; color: var(--ink); padding: 11px 15px; }
+.filter-pills .selected { background: #fae8ef; color: #963650; border-color: #edbfd1; font-weight: 700; }
+.player-team { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
+.schedule-filters label { margin-top: 16px; }
+.fixture-round .score { display: inline-flex; align-items: center; gap: 6px; }
+.archive-match { border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-top: 16px; background: #fff; }
+.archive-match .actions { margin-top: 12px; }
+.poster-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.poster-double { grid-column: span 2; }
+.weekly-poster { min-height: 900px; }

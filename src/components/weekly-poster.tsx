@@ -126,13 +126,13 @@ export default function WeeklyPoster({
             rows={statRows("d1")}
           />
         </div>
-      </div>
       <Block
         highlight={false}
         title="Cup"
         subtitle="Games won · Cup scoring rules awaiting confirmation"
         rows={cup.map((r) => ({ name: r.team, value: r.gamesFor }))}
       />
+      </div>
       <footer>
         {incomplete
           ? `INCOMPLETE: ${incomplete} scheduled matches still need approved results.`
