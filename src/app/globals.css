@@ -881,3 +881,13 @@ td { padding: 12px 9px; }
 .poster-block { background: white; }
 .poster-block h2 { min-height: 85px; }
 .weekly-poster footer { border: 0; margin-top: 12px; }
+
+.poster-main-tables { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; margin-bottom: 20px; }
+.poster-main-tables .poster-league { margin-bottom: 0; min-width: 0; }
+.poster-main-tables .poster-league-title { flex-wrap: wrap; min-height: 100px; gap: 8px 18px; }
+.poster-main-tables .poster-league-title small { margin-left: 0; }
+.poster-main-tables th:not(:first-child), .poster-main-tables td:not(:first-child) { width: auto; }
+.poster-main-tables td:first-child { white-space: normal; }
+.poster-cup-empty { padding: 55px 24px; text-align: center; color: #806f7b; font-size: 26px; }
+.poster-cup-empty p, .poster-cup .cup-note { font-size: 18px; }
+.poster-grid > .poster-block:last-child { grid-column: span 2; }
