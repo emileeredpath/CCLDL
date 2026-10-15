@@ -137,8 +137,8 @@ function Table({
               <th>Played</th>
               {competition === "cup" && <th>Won</th>}
               {!breakdown && <th>Lost</th>}
-              {competition === "league" && <th>Points</th>}
               {breakdown && kinds.map((kind) => <th key={kind}>{kind}</th>)}
+              {competition === "league" && <th>{breakdown ? "Total points" : "Points"}</th>}
             </tr>
           </thead>
           <tbody>
@@ -148,12 +148,12 @@ function Table({
                 <td>{r.played}</td>
                 {competition === "cup" && <td>{r.gamesFor}</td>}
                 {!breakdown && <td>{r.gamesAgainst}</td>}
+                {breakdown && kinds.map((kind, i) => <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>)}
                 {competition === "league" && (
                   <td style={{ color: "var(--pink)", fontWeight: 700 }}>
                     {r.gamesFor}
                   </td>
                 )}
-                {breakdown && kinds.map((kind, i) => <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>)}
               </tr>
             ))}
           </tbody>
@@ -942,8 +942,6 @@ export default function Workspace() {
                 ))}
               </div>
             )}
-            <div className="grid">
-              <div>
                 <div className="card">
                   <div className="card-head">
                     <h2>League table</h2>
@@ -962,6 +960,8 @@ export default function Workspace() {
                     season={season}
                   />
                 </div>
+            <div className="grid">
+              <div>
                 <div className="card">
                   <div className="card-head">
                     <h2>Latest results</h2>
