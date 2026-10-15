@@ -69,7 +69,7 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
     .click();
   await expect(
     page.getByRole("heading", {
-      name: "The Gail Wander Trophy Overall league points",
+      name: "The Gail Wander Trophy",
     }),
   ).toBeVisible();
   await expect(

@@ -861,3 +861,23 @@ td { padding: 12px 9px; }
 .poster-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .poster-double { grid-column: span 2; }
 .weekly-poster { min-height: 900px; }
+
+/* Lead the weekly image with the league, then read awards left to right. */
+.weekly-poster { padding: 24px; background: #fff8fb; border-radius: 0; }
+.poster-header { border: 0; background: transparent; padding: 10px 12px 24px; }
+.poster-league { border: 2px solid #903857; background: white; margin-bottom: 20px; }
+.poster-league-title { display: flex; align-items: center; gap: 20px; background: #903857; color: white; padding: 16px 22px; }
+.poster-league-title span { font-size: 28px; font-weight: 800; }
+.poster-league-title h2 { font-family: Georgia, serif; font-size: 26px; }
+.poster-league-title small { margin-left: auto; font-size: 20px; }
+.poster-league table { font-size: 24px; }
+.poster-league th { font-size: 16px; padding: 10px 22px; }
+.poster-league td { padding: 9px 22px; }
+.poster-league th:not(:first-child), .poster-league td:not(:first-child) { text-align: right; width: 180px; }
+.poster-league td:last-child { font-size: 26px; color: #903857; font-weight: 800; }
+.poster-league .leader { background: #f8dce7; font-weight: 700; }
+.poster-league p { padding: 18px; font-size: 22px; }
+.poster-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.poster-block { background: white; }
+.poster-block h2 { min-height: 85px; }
+.weekly-poster footer { border: 0; margin-top: 12px; }

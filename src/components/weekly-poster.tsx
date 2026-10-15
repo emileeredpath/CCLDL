@@ -99,39 +99,20 @@ export default function WeeklyPoster({
           {demo ? " · FICTIONAL DEMONSTRATION" : ""}
         </small>
       </header>
+      <section className="poster-league">
+        <div className="poster-league-title"><span>LEAGUE TABLE</span><h2>The Gail Wander Trophy</h2><small>Overall league points</small></div>
+        {league.length ? <table>
+          <thead><tr><th>Team</th><th>Played</th><th>Total points</th></tr></thead>
+          <tbody>{league.map((r) => <tr key={r.team} className={r.gamesFor === league[0]?.gamesFor ? "leader" : ""}><td>{r.team}</td><td>{r.played}</td><td>{r.gamesFor}</td></tr>)}</tbody>
+        </table> : <p>No approved league results recorded</p>}
+      </section>
       <div className="poster-grid">
-        <Block
-          title="Lorraine Hudson Trophy"
-          subtitle="Highest Score"
-          rows={statRows("score")}
-        />
-        <Block
-          title="The Gail Wander Trophy"
-          subtitle="Overall league points"
-          rows={league.map((r) => ({ name: r.team, value: r.gamesFor }))}
-        />
+        {["Singles", "Pairs", "Trebles"].map((k) => <Block key={k} title={k} rows={categoryRows(k)} />)}
+        <Block title="Leigh Barnes Trophy" subtitle="Captains & vice" rows={categoryRows("Captains & vice")} />
+        <Block title="Lorraine Hudson Trophy" subtitle="Highest Score" rows={statRows("score")} />
         <Block title="Highest Checkout" rows={statRows("checkout")} />
-        {["Pairs", "Trebles", "Singles"].map((k) => (
-          <Block key={k} title={k} rows={categoryRows(k)} />
-        ))}
-        <Block
-          title="Leigh Barnes Trophy"
-          subtitle="Captains & vice"
-          rows={categoryRows("Captains & vice")}
-        />
-        <div className="poster-double">
-          <Block
-            title="The Pitt Stop Madhouse Trophy"
-            subtitle="Double 1 finishes"
-            rows={statRows("d1")}
-          />
-        </div>
-      <Block
-        highlight={false}
-        title="Cup"
-        subtitle="Games won · Cup scoring rules awaiting confirmation"
-        rows={cup.map((r) => ({ name: r.team, value: r.gamesFor }))}
-      />
+        <Block title="The Pitt Stop Madhouse Trophy" subtitle="Double 1 finishes" rows={statRows("d1")} />
+        <Block highlight={false} title="Cup" subtitle="Games won · scoring rules awaiting confirmation" rows={cup.map((r) => ({ name: r.team, value: r.gamesFor }))} />
       </div>
       <footer>
         {incomplete

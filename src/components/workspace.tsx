@@ -137,7 +137,7 @@ function Table({
             <tr>
               <th>Team</th>
               <th>Played</th>
-              {full && <><th>Won</th><th>Drawn</th><th>Lost</th><th>Games for</th><th>Games against</th></>}
+              {full && <><th>Won</th><th>Drawn</th><th>Lost</th></>}
               {competition === "cup" && <th>Won</th>}
               {!breakdown && <th>Lost</th>}
               {breakdown && kinds.map((kind) => <th key={kind}>{kind}</th>)}
@@ -149,7 +149,7 @@ function Table({
               <tr key={r.team}>
                 <td style={{ fontWeight: 600 }}>{r.team}</td>
                 <td>{r.played}</td>
-                {full && <><td>{r.won}</td><td>{r.drawn}</td><td>{r.lost}</td><td>{r.gamesFor}</td><td>{r.gamesAgainst}</td></>}
+                {full && <><td>{r.won}</td><td>{r.drawn}</td><td>{r.lost}</td></>}
                 {competition === "cup" && <td>{r.gamesFor}</td>}
                 {!breakdown && <td>{r.gamesAgainst}</td>}
                 {breakdown && kinds.map((kind, i) => <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>)}
