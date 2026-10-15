@@ -820,3 +820,29 @@ input[type="file"] {
 .match-summary td {
   padding: 12px 6px;
 }
+
+/* Compact secretary dashboard, inspired by the supplied design reference. */
+:root { --ink: #242436; --muted: #706b7a; --line: #eae6ed; }
+body { background: #f7f5f8; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.shell { max-width: 1180px; grid-template-columns: 220px minmax(0, 1fr); }
+.main { padding: 24px 28px 96px; }
+.hero { background: linear-gradient(130deg, #fff1f7, #fff); border: 1px solid #f2dae5; border-radius: 20px; padding: 22px; margin: 20px 0; }
+.hero h1 { font-size: 27px; }
+.card { padding: 18px; box-shadow: none; }
+.card-head { margin-bottom: 14px; }
+td { padding: 12px 9px; }
+.draft-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; background: white; border: 0; border-top: 1px solid var(--line); padding: 14px 0; text-align: left; color: var(--ink); }
+.draft-row small { display: block; color: var(--muted); margin-top: 5px; }
+.review-queue .card-head { flex-wrap: wrap; }
+.save-error { border-color: #bc3551; background: #fff0f1; color: #8b1d36; }
+.result-actions button { min-height: 48px; }
+@media(max-width: 640px) {
+  .shell { display: block; }
+  .main { padding: 16px 14px 110px; }
+  .hero { padding: 18px; margin: 16px 0; }
+  .hero h1 { font-size: 25px; }
+  .card { padding: 16px; margin-bottom: 14px; }
+  .result-actions { display: grid; grid-template-columns: 1fr; }
+  .result-actions .primary { grid-row: 1; }
+  .draft-row strong { font-size: 14px; }
+}

@@ -30,6 +30,7 @@ test("Players and match results survive draft, approval and reload; pending achi
   const players: { id: string; name: string; team_id: string }[] = [];
   const writes: { name: string; team_id: string }[] = [];
   let failNext = false;
+  let failApproval = true;
   let savedResult: Record<string, unknown> | null = null;
   const sheets: Record<string, unknown>[] = [];
   let photoWrites = 0;
@@ -114,6 +115,10 @@ test("Players and match results survive draft, approval and reload; pending achi
     ) {
       const body = req.postDataJSON();
       const approved = path.endsWith("save_summary_result");
+      if (approved && failApproval) {
+        failApproval = false;
+        return json({message: "Approval temporarily unavailable", code: "TEST"}, 400);
+      }
       savedResult = {
         id: "result",
         fixture_id: body.p_fixture,
@@ -264,6 +269,9 @@ test("Players and match results survive draft, approval and reload; pending achi
   await page
     .getByRole("button", { name: "Approve & save result", exact: true })
     .click();
+  await expect(page.locator(".save-error")).toContainText("Approval temporarily unavailable");
+  await expect(page.locator(".save-error")).toContainText("Your entries are still here");
+  await page.getByRole("button", {name: "Approve & save result", exact: true}).click();
   await expect(page.getByRole("status")).toContainText("Saved successfully");
   await expect(
     page.getByText("Saved & approved", { exact: true }),

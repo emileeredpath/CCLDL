@@ -177,6 +177,7 @@ export default function Workspace() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [results, setResults] = useState<Result[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [seasons, setSeasons] = useState<Option[]>([]);
@@ -409,6 +410,7 @@ export default function Workspace() {
     setBusy(false);
   }
   function chooseFixture(id: string) {
+    setSaveError("");
     setFixtureId(id);
     setArchivePreview("");
     setDetailed(false);
@@ -456,7 +458,7 @@ export default function Workspace() {
       const uploaded = await client.storage
         .from("result-sheets")
         .upload(path, file, { upsert: false, contentType: file.type });
-      if (uploaded.error) throw uploaded.error;
+      if (uploaded.error) throw new Error(uploaded.error.message);
       const row = await client
         .from("result_sheets")
         .insert({ fixture_id: selected.id, storage_path: path })
@@ -473,7 +475,9 @@ export default function Workspace() {
       await load();
       return row.data.id as string;
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Upload failed");
+      const reason = e instanceof Error ? e.message : "Photo upload failed. Please try again.";
+      setMessage(reason);
+      setSaveError(reason);
       return null;
     } finally {
       setBusy(false);
@@ -553,7 +557,12 @@ export default function Workspace() {
     }
   }
   async function approve() {
-    if (!client || !selected) return;
+    if (!client || !selected || busy) return;
+    setSaveError("");
+    if (!sheetId && !file) {
+      setSaveError("Choose the original photograph above before saving this result.");
+      return;
+    }
     setBusy(true);
     try {
       let savedSheet = sheetId;
@@ -573,16 +582,16 @@ export default function Workspace() {
             }
           : { p_fixture: selected.id, p_sheet: savedSheet, p_summary: summary },
       );
-      if (error) throw error;
+      if (error) throw new Error(error.message);
       const verification = await client
         .from("results")
         .select("id,status")
         .eq("fixture_id", selected.id)
         .single();
       if (verification.error || verification.data?.status !== "approved") {
-        setMessage(
-          "Your save was accepted, but we couldn't confirm it by reloading. Check Results before saving again.",
-        );
+        const notice = "Your save was accepted, but we couldn't confirm it by reloading. Check Results before saving again.";
+        setMessage(notice);
+        setSaveError(notice);
         return;
       }
       setReview(false);
@@ -593,7 +602,9 @@ export default function Workspace() {
       setViewedFixtureId(selected.id);
       setScreen("Match summary");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Save failed");
+      const reason = e instanceof Error ? e.message : "The database could not save this result. Please try again.";
+      setSaveError(reason);
+      setMessage(reason);
     } finally {
       setBusy(false);
     }
@@ -894,6 +905,17 @@ export default function Workspace() {
         )}
         {screen === "Home" && (
           <>
+            {results.some((r) => r.season === season && !r.approved) && (
+              <div className="card review-queue">
+                <div className="card-head"><div><span className="eyebrow">Finish your results</span><h2>Saved drafts to check</h2></div><span className="badge">Not yet in tables</span></div>
+                {results.filter((r) => r.season === season && !r.approved).map((r) => (
+                  <button className="draft-row" key={r.id} disabled={busy} onClick={() => editResult(r.id)}>
+                    <span><strong>{r.home} v {r.away}</strong><small>{dateLabel(r.date)} · Check & approve</small></span>
+                    <span className="score">{r.homeWins} – {r.awayWins}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="grid">
               <div>
                 <div className="card">
@@ -1281,7 +1303,13 @@ export default function Workspace() {
                               : "away",
                         }))}
                     />
-                    <div className="actions">
+                    <div className="save-feedback" aria-live="polite">
+                      {saveError && <p className="notice save-error" role="alert">{saveError} Your entries are still here.</p>}
+                      {!formComplete && <p className="notice">Complete the scores and select a saved player for each achievement. Confirm any pending players before approval.</p>}
+                      {review && !sheetId && !file && <p className="notice">One step left: choose the original photograph above to enable approval.</p>}
+                      {review && formComplete && (sheetId || file) && <p className="muted">Ready to save. Approval adds this result and its achievements to the tables.</p>}
+                    </div>
+                    <div className="actions result-actions">
                       {!review &&
                         !results.some(
                           (r) => r.fixtureId === fixtureId && r.approved,
@@ -1305,6 +1333,7 @@ export default function Workspace() {
                         <>
                           <button
                             className="secondary"
+                            disabled={busy}
                             onClick={() => setReview(false)}
                           >
                             Make corrections
@@ -1320,7 +1349,7 @@ export default function Workspace() {
                             }
                             onClick={approve}
                           >
-                            Approve & save result
+                            {busy ? "Saving result…" : "Approve & save result"}
                           </button>
                         </>
                       ) : (
@@ -1388,6 +1417,7 @@ export default function Workspace() {
                         <div className="actions">
                           <button
                             className="secondary"
+                            disabled={busy}
                             onClick={() => setReview(false)}
                           >
                             Make corrections
@@ -1402,7 +1432,7 @@ export default function Workspace() {
                             }
                             onClick={approve}
                           >
-                            Approve & save result
+                            {busy ? "Saving result…" : "Approve & save result"}
                           </button>
                         </div>
                       </>
