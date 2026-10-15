@@ -261,4 +261,14 @@ await assert.rejects(save(summary));
 console.log(
   "PASS: migrations; summary save/edit and validation; private access; audit/original retention; Cup totals; legacy save/edit and conversion protection.",
 );
+await db.exec("reset role; create or replace function auth.uid() returns uuid language sql as $$ select '00000000-0000-0000-0000-000000000001'::uuid $$;");
+await db.exec(fs.readFileSync(new URL("../../supabase/migrations/202610150001_remove_duplicate_sheets.sql", import.meta.url), "utf8"));
+const linked = (await db.query("select sheet_id,fixture_id,id,status from results where sheet_id is not null limit 1")).rows[0];
+await assert.rejects(db.query("select remove_result_sheet($1)", [linked.sheet_id]), /original linked/);
+const extra = (await db.query("insert into result_sheets(fixture_id,storage_path) values($1,'test/duplicate.jpg') returning id", [linked.fixture_id])).rows[0].id;
+await db.query("select remove_result_sheet($1)", [extra]);
+assert((await db.query("select removed_at from result_sheets where id=$1", [extra])).rows[0].removed_at);
+await assert.rejects(db.query("update results set sheet_id=$1 where id=$2", [extra,linked.id]), /active original/);
+assert.equal((await db.query("select status from results where id=$1", [linked.id])).rows[0].status,linked.status);
+console.log("PASS: duplicate removal retains original, protects linked sheet, preserves result and rejects relinking removed sheets.");
 await db.close();

@@ -846,3 +846,6 @@ td { padding: 12px 9px; }
   .result-actions .primary { grid-row: 1; }
   .draft-row strong { font-size: 14px; }
 }
+
+.sheet-actions { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; }
+.remove-sheet { border: 0; background: transparent; color: #9d3159; font-size: 24px; min-width: 44px; min-height: 44px; border-left: 1px solid var(--line); }

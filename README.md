@@ -131,3 +131,17 @@ Select the photograph and review the result; approval archives a selected photo 
 Transcribed data imports are private artifacts outside the public repository. Imports should reuse fixtures/players, preserve existing results, and create drafts with original-photo checks rather than fabricating archive objects. Unknown identities are stored in `summary.pending_achievements`; the form lets the committee resolve them against the recorded team or add a known name. Resolution preserves the finish count and merges into an existing achievement row. Approval is blocked on both client and database while unresolved entries remain. The whole-season fixture schedule must be supplied by the committee; result sheets only establish their particular matches.
 
 Inline player duplicate checks are application-level; concurrent creations in separate sessions may still need committee deduplication. Browser write tests use mocked Supabase responses, and SQL checks use disposable PostgreSQL-compatible databases. These checks do not claim a live Railway/Supabase acceptance run.
+
+### Duplicate result-sheet uploads
+
+Apply `supabase/migrations/202610150001_remove_duplicate_sheets.sql` in the
+Supabase SQL Editor to enable the × controls in Results. This additive migration
+can be rerun. Removal hides an extra upload from the app while retaining its
+private original and audit history. A photograph linked to a saved result cannot
+be removed; remove the other uploads for that fixture instead. Scores and player
+achievements are unaffected. The application reports a missing database update
+if the migration has not yet been applied.
+
+The Home league table shows points alongside pairs, trebles, singles and captains
+& vice wins, calculated from approved league results for the selected season and
+cutoff date. Cup results remain separate.

@@ -116,13 +116,17 @@ function Table({
   competition,
   cutoff,
   season,
+  breakdown = false,
 }: {
+  breakdown?: boolean;
   results: Result[];
   competition: "league" | "cup";
   cutoff: string;
   season: string;
 }) {
   const rows = standings(results, competition, cutoff, season);
+  const kinds = ["Pairs", "Trebles", "Singles", "Captains & vice"];
+  const totals = kinds.map((kind) => new Map(categoryStandings(results, kind, season, cutoff).map((r) => [r.name, r.value])));
   return (
     <>
       <div className="table-wrap">
@@ -132,8 +136,9 @@ function Table({
               <th>Team</th>
               <th>Played</th>
               {competition === "cup" && <th>Won</th>}
-              <th>Lost</th>
+              {!breakdown && <th>Lost</th>}
               {competition === "league" && <th>Points</th>}
+              {breakdown && kinds.map((kind) => <th key={kind}>{kind}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -142,12 +147,13 @@ function Table({
                 <td style={{ fontWeight: 600 }}>{r.team}</td>
                 <td>{r.played}</td>
                 {competition === "cup" && <td>{r.gamesFor}</td>}
-                <td>{r.gamesAgainst}</td>
+                {!breakdown && <td>{r.gamesAgainst}</td>}
                 {competition === "league" && (
                   <td style={{ color: "var(--pink)", fontWeight: 700 }}>
                     {r.gamesFor}
                   </td>
                 )}
+                {breakdown && kinds.map((kind, i) => <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>)}
               </tr>
             ))}
           </tbody>
@@ -314,7 +320,7 @@ export default function Workspace() {
         };
       }),
     );
-    setSheets(responses[5].data ?? []);
+    setSheets((responses[5].data ?? []).filter((s) => !s.removed_at));
     const totals = new Map<string, Stat>();
     for (const r of responses[4].data ?? []) {
       const f = fs.find((f) => f.id === r.fixture_id);
@@ -640,6 +646,26 @@ export default function Workspace() {
     );
     setScreen("Add Result");
   }
+  async function removeSheet(sheet: Sheet) {
+    if (!client || busy || demo) return;
+    if (!window.confirm("Remove this extra photograph from the results list? The original file is retained securely for the edit history.")) return;
+    setBusy(true);
+    const { error } = await client.rpc("remove_result_sheet", { p_sheet: sheet.id });
+    if (error) {
+      window.alert(error.code === "PGRST202" ? "Photo removal needs the latest database update first." : error.message);
+    } else {
+      setSheets((current) => current.filter((s) => s.id !== sheet.id));
+      setArchivePreview("");
+      setMessage("Extra photograph removed from the results list. Your scores are unchanged.");
+    }
+    setBusy(false);
+  }
+  function sheetButtons(s: Sheet, label: string) {
+    return <span className="sheet-actions" key={s.id}>
+      <button className="secondary" onClick={() => openSheet(s)}>{label}</button>
+      <button className="remove-sheet" disabled={demo || busy} aria-label={`Remove ${label}`} title="Remove extra photograph" onClick={() => removeSheet(s)}>×</button>
+    </span>;
+  }
   async function openSheet(sheet: Sheet) {
     if (!client) return;
     const r = await client.storage
@@ -931,6 +957,7 @@ export default function Workspace() {
                   <Table
                     results={results}
                     competition="league"
+                    breakdown
                     cutoff={week}
                     season={season}
                   />
@@ -1562,15 +1589,7 @@ export default function Workspace() {
                       </button>
                       {sheets
                         .filter((s) => s.fixture_id === r.fixtureId)
-                        .map((s, i) => (
-                          <button
-                            className="secondary"
-                            key={s.id}
-                            onClick={() => openSheet(s)}
-                          >
-                            Original photo {i + 1}
-                          </button>
-                        ))}
+                        .map((s, i) => sheetButtons(s, `Original photo ${i + 1}`))}
                     </div>
                   </div>
                 ))}
@@ -1601,12 +1620,7 @@ export default function Workspace() {
                           saved
                         </p>
                       </div>
-                      <button
-                        className="secondary"
-                        onClick={() => openSheet(s)}
-                      >
-                        View original
-                      </button>
+                      {sheetButtons(s, "View original")}
                     </div>
                   );
                 })}
