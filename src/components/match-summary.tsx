@@ -92,6 +92,16 @@ export default function MatchSummary({
                     {p.highest_score ?? "—"} · Checkout:{" "}
                     {p.highest_checkout ?? "—"}
                   </p>
+                  {p.recorded_scores?.length && (
+                    <p className="muted">
+                      Recorded scores: {p.recorded_scores.join(", ")}
+                    </p>
+                  )}
+                  {p.recorded_checkouts?.length && (
+                    <p className="muted">
+                      Recorded checkouts: {p.recorded_checkouts.join(", ")}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

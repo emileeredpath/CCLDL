@@ -38,3 +38,30 @@ test("12 games and correct League and Cup formats", () => {
   assert.equal(gameTypes("league").filter((x) => x === "Trebles").length, 2);
   assert.ok(gameTypes("cup").every((x) => x === "Singles"));
 });
+
+test("Cup 2/1/0 recalculates historical wins draws losses and corrections; all teams included", () => {
+  const cup = { ...result, competition: "cup" as const };
+  const games = [
+    cup,
+    { ...cup, id: "2", home: "B", away: "C", homeWins: 6, awayWins: 6 },
+  ];
+  let rows = standings(games, "cup", "2026-10-10", "2026/27", [
+    "A",
+    "B",
+    "C",
+    "D",
+  ]);
+  assert.equal(rows.find((r) => r.team === "A")?.points, 2);
+  assert.equal(rows.find((r) => r.team === "B")?.points, 1);
+  assert.equal(rows.find((r) => r.team === "B")?.lost, 1);
+  assert.equal(rows.find((r) => r.team === "C")?.drawn, 1);
+  assert.equal(rows.find((r) => r.team === "D")?.played, 0);
+  rows = standings(
+    [{ ...cup, homeWins: 5, awayWins: 7 }, games[1]],
+    "cup",
+    "2026-10-10",
+  );
+  assert.equal(rows.find((r) => r.team === "B")?.points, 3);
+  assert.equal(rows.find((r) => r.team === "A")?.points, 0);
+  assert.equal(standings([result], "league", "2026-10-10")[0].points, 7);
+});

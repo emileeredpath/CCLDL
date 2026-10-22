@@ -1,5 +1,6 @@
 import type { EntryPlayer } from "./manual-entry";
 export type Summary = {
+  ocr_review?: { text: string; reviewed_at: string };
   counts: Record<string, number | null>;
   achievements: EntryPlayer[];
   notes?: string;
@@ -43,6 +44,15 @@ export function summaryValid(s: Summary, cup: boolean) {
           (n, i) =>
             n === null ||
             (Number.isInteger(n) && n > 0 && n <= (i === 0 ? 180 : 170)),
+        ) &&
+        [p.recorded_scores, p.recorded_checkouts].every(
+          (values, i) =>
+            values === undefined ||
+            (Array.isArray(values) &&
+              values.every(
+                (n) =>
+                  Number.isInteger(n) && n > 0 && n <= (i === 0 ? 180 : 170),
+              )),
         ) &&
         (p.double_ones > 0 ||
           p.highest_score !== null ||

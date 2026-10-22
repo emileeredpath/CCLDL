@@ -3,7 +3,14 @@ import { test, expect } from "@playwright/test";
 test("Players and match results survive draft, approval and reload; pending achievements resolve safely", async ({
   page,
 }) => {
+  test.setTimeout(90000); // Includes two real, locally executed OCR runs.
   await page.setViewportSize({ width: 320, height: 740 });
+  const externalRequests: string[] = [];
+  page.on("request", (r) => {
+    const host = new URL(r.url()).hostname;
+    if (host && !["127.0.0.1", "league-test.invalid"].includes(host))
+      externalRequests.push(host);
+  });
   const user = {
     id: "00000000-0000-0000-0000-000000000001",
     aud: "authenticated",
@@ -82,6 +89,14 @@ test("Players and match results survive draft, approval and reload; pending achi
           home_team_id: "home",
           away_team_id: "away",
         },
+        {
+          id: "cup-fixture",
+          season_id: "season",
+          competition: "cup",
+          played_on: "2026-10-20",
+          home_team_id: "home",
+          away_team_id: "away",
+        },
       ]);
     if (path.startsWith("/storage/v1/object/result-sheets/")) {
       photoWrites++;
@@ -117,7 +132,10 @@ test("Players and match results survive draft, approval and reload; pending achi
       const approved = path.endsWith("save_summary_result");
       if (approved && failApproval) {
         failApproval = false;
-        return json({message: "Approval temporarily unavailable", code: "TEST"}, 400);
+        return json(
+          { message: "Approval temporarily unavailable", code: "TEST" },
+          400,
+        );
       }
       savedResult = {
         id: "result",
@@ -255,28 +273,63 @@ test("Players and match results survive draft, approval and reload; pending achi
   await expect(
     page.getByLabel("Highest score", { exact: true }).first(),
   ).toHaveValue("140");
+  const image = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 1000;
+    c.height = 500;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, 1000, 500);
+    ctx.fillStyle = "black";
+    ctx.font = "48px Arial";
+    ctx.fillText("LEAGUE RESULT SHEET", 30, 90);
+    ctx.fillText("PAIRS TREBLES SINGLES", 30, 170);
+    ctx.fillText("06/10/2026", 30, 250);
+    return c.toDataURL("image/png").split(",")[1];
+  });
   await page.locator('input[type="file"]').setInputFiles({
     name: "sheet.png",
     mimeType: "image/png",
-    buffer: Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aA8sAAAAASUVORK5CYII=",
-      "base64",
-    ),
+    buffer: Buffer.from(image, "base64"),
   });
+  await page
+    .getByText("Read handwriting (free, experimental)", { exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Read selected area", exact: true })
+    .click();
+  await expect(page.getByLabel("Recognised text")).toHaveValue(/TREBLES/, {
+    timeout: 45000,
+  });
+  await expect(
+    page.getByRole("region", { name: "Free local scanner" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Add missing reading" }).click();
+  await expect(
+    page.getByRole("button", { name: "Use checked readings in form" }),
+  ).toBeDisabled();
+  expect(approvedPayload).toBeNull();
   await page
     .getByRole("button", { name: "Review result", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Approve & save result", exact: true })
     .click();
-  await expect(page.locator(".save-error")).toContainText("Approval temporarily unavailable");
-  await expect(page.locator(".save-error")).toContainText("Your entries are still here");
-  await page.getByRole("button", {name: "Approve & save result", exact: true}).click();
+  await expect(page.locator(".save-error")).toContainText(
+    "Approval temporarily unavailable",
+  );
+  await expect(page.locator(".save-error")).toContainText(
+    "Your entries are still here",
+  );
+  await page
+    .getByRole("button", { name: "Approve & save result", exact: true })
+    .click();
   await expect(page.getByRole("status")).toContainText("Saved successfully");
   await expect(
     page.getByText("Saved & approved", { exact: true }),
   ).toBeVisible();
   expect(photoWrites).toBe(1);
+  expect(externalRequests).toEqual([]);
   expect(approvedPayload).toMatchObject({
     p_sheet: "sheet",
     p_fixture: "fixture",
@@ -363,4 +416,62 @@ test("Players and match results survive draft, approval and reload; pending achi
   await expect(
     page.getByLabel("Highest checkout", { exact: true }).nth(1),
   ).toHaveValue("78");
+  // Cup OCR stays local and reviewed occurrences become a single player count.
+  await nav.getByRole("button", { name: "Add Result", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: /^Fixture/ })
+    .selectOption("cup-fixture");
+  await page
+    .getByLabel("Home Team Singles wins", { exact: true })
+    .selectOption("7");
+  const cupImage = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 1000;
+    c.height = 400;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "white";
+    x.fillRect(0, 0, 1000, 400);
+    x.fillStyle = "black";
+    x.font = "48px Arial";
+    x.fillText("CUP RESULT SHEET", 30, 100);
+    x.fillText("Singles 7 - 5", 30, 200);
+    return c.toDataURL().split(",")[1];
+  });
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles({
+      name: "cup.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(cupImage, "base64"),
+    });
+  await page
+    .getByText("Read handwriting (free, experimental)", { exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Read selected area", exact: true })
+    .click();
+  await expect(page.getByLabel("Recognised text")).toHaveValue(/CUP/, {
+    timeout: 45000,
+  });
+  await page
+    .getByRole("combobox", { name: "Read area", exact: true })
+    .selectOption("double_ones");
+  await page.getByLabel("Recognised text").fill("New Player\nNew Player");
+  await page
+    .getByRole("button", { name: "Update suggestions from this text" })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: /Reading \d player/ }),
+  ).toHaveCount(2);
+  await page.getByLabel(/I checked the fixture/).check();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Use checked readings in form" })
+    .click();
+  await expect(page.getByLabel("Double 1s", { exact: true })).toHaveValue("2");
+  await expect(
+    page.getByLabel("Home Team Singles wins", { exact: true }),
+  ).toHaveValue("7");
+  expect((approvedPayload as any).p_fixture).toBe("fixture");
+  expect(externalRequests).toEqual([]);
 });

@@ -53,15 +53,15 @@ Real backend flows require this integration acceptance check before claiming pro
 - Weekly PNG export, date cutoff and missing-result flag.
 - Manifest, 192/512 PNG icons, safe service worker with an offline message. Authenticated records and photos are never cached.
 
-The Gail Wander Trophy is total league games won: pairs + trebles + singles + captains & vice. League tables show most points first, with equal points tied; alphabetical names within ties are only display order. Cup shows match/game totals, no invented points. Statistics remain scoped to the selected competition. Zero is displayed as zero, not a fabricated achievement.
+The Gail Wander Trophy is total league games won: pairs + trebles + singles + captains & vice. League tables show most points first, with equal points tied; alphabetical names within ties are only display order. Cup awards 2 points for a win, 1 for a draw and 0 for a loss. Player statistics combine League and Cup within the season. Zero is displayed as zero, not a fabricated achievement.
 
 ## Phase 2 / limitations
 
 - Test against the real Supabase project, including RLS, storage and transaction behavior; add automated backend and browser tests before live use.
 - Fixture editing/deletion UI, player transfers and season-specific rosters, invitation/password recovery flows, photo recovery tooling, richer actor-labelled audit views and accessible UI polish.
-- Confirm further League tie-break rules, Cup points/ranking and whether weekly player statistics should combine competitions.
+- Confirm any additional tie-break rules; equal points currently remain tied.
 - Historical PNGs currently use corrected records as of the selected match-date cutoff. They **do not** recreate what was known or published at that time. Immutable publication snapshots and historical revision reconstruction remain to be built.
-- Native device install checks, automated backup scheduling and restore drills remain to be tested. Photo scanning has been removed after poor real-world handwriting results.
+- Native device install checks, automated backup scheduling and restore drills remain to be tested. Local OCR is review-assisted because real handwriting recognition remains unreliable.
 - CSV exports can be opened in Excel; native `.xlsx` exports are not yet implemented.
 
 ## PWA
@@ -100,7 +100,7 @@ New League results use four home-win totals (3 pairs, 2 trebles, 1 captains & vi
 
 Home has no upcoming-fixture or approval/archive counters. Fixtures is only the saved schedule. More → Teams & players holds administration. Tables combines standings, category totals and player statistics. More → Results shows existing scores, edits, originals and history.
 
-Weekly Overview exports a 2160px-wide PNG with a responsive preview. Trophy headings match the committee's example: Lorraine Hudson Trophy / Highest Score, The Gail Wander Trophy, Highest Checkout, Pairs, Trebles, Singles, Leigh Barnes Trophy / Captains & vice, and The Pitt Stop Madhouse Trophy / Double 1 finishes. Cup stays separate. Equal leading totals share highlighting; Cup has no ranking highlight. Select the date and competition for player statistics; incomplete scheduled results and absent category breakdowns are flagged. Download the PNG and attach it to the Facebook group manually; nothing is posted automatically. Historical exports use currently corrected records.
+Weekly Overview exports a 2160px-wide, taller PNG with large type, both full season tables and top-five player awards. Select a cutoff date; all player statistics combine League and Cup. Historical exports use currently corrected records. Download and share the image manually; nothing is posted automatically.
 
 Validation: unit checks cover score bounds, duplicate players, competition/date/season separation and category aggregation. Browser checks cover 320px entry, CSV review, navigation and an actual PNG download. Database checks exercise both migrations, summary approval/edit validation, Cup, nonmember RLS denial, original retention, audit history and preservation/editing of detailed results. Live Supabase acceptance and actual iPhone/Android device checks remain separate.
 
@@ -153,8 +153,65 @@ Open any match to see its summary and private original sheets, or enter its resu
 Tables combines match totals and game categories, followed by category leaders and
 switchable player-statistic lists. The result archive retains team and date filters.
 
-Weekly PNGs use a landscape layout. The preview scales to phone width; the export
-retains all rows and widens for unusually long standings rather than clipping data.
-Automatic handwriting extraction remains unavailable. A future assisted scanner
-must be evaluated against representative sheets and must require review before
-saving. Do not enable a paid OCR/vision provider without committee authorization.
+Weekly PNGs use a taller readability-first layout. The preview scales to phone width; export retains all season teams and five player rows per award.
+The local assisted scanner described below needs no provider configuration. Review is required before saving.
+Do not enable a paid OCR/vision provider without committee authorization.
+
+
+### October 2026 accuracy and mobile update
+
+Cup points are calculated from the current approved results: win 2, draw 1,
+loss 0. League points remain legs won. Equal points are tied; alphabetical order
+within ties is only a display order. Both tables include teams with season fixtures
+but no results, so all nine scheduled teams remain visible.
+
+Player statistics use stable player IDs and combine approved League and Cup
+results for the selected season and date. Corrections replace the current result;
+aggregation is recomputed, never incremented on top of old totals. Every recorded
+Double 1 counts. Additional score/checkout readings are retained as arrays inside
+the existing summary JSON and can be edited under each player's recorded readings.
+Older records without these arrays remain compatible. Raw reviewed OCR text is
+retained in summary JSON; originals and audit history remain in Supabase.
+
+The PNG uses a fixed 1080px layout exported at 2× resolution. Larger typography
+and vertically stacked tables favour readability over landscape. All season teams
+appear in both tables; only five players appear per award. Joint positions use
+competition ranks (1,1,3), and equal values are ordered by name then ID. A tie at
+the fifth row does not expand the image: all tied players remain in dashboard lists.
+
+### Free local OCR and review
+
+Tesseract.js runs in a browser worker. The worker, WASM and English data are copied
+from locked npm packages into `/public/ocr` by `prebuild`/`predev`. No image leaves
+the device for OCR, no provider API key is needed, and no paid service is enabled.
+Normal private Supabase archival still occurs when saving the result.
+
+Select one photograph and a fixture. Read the whole sheet or crop the Double 1
+column / handwritten notes. OCR type/date suggestions never change the selected
+fixture. Text and individual readings remain editable. Exact unique saved-player
+matches are suggestions; unclear names require explicit selection. Every repeated
+Double 1 line remains a separate reading. A rescan of the same region replaces
+its suggestions, and applying readings replaces form achievements after confirmation.
+No scan creates players, results or approvals. Home wins remain manual (with
+conservative complete-category suggestions); away wins calculate automatically.
+OCR cannot reliably recognise handwriting or crossed-out entries, so the review
+checklist and manual fallback are mandatory. Correct the raw text, add missed
+readings, or enter normally if recognition is poor. Do not present this as a fully
+automatic or validated handwritten-sheet scanner.
+
+### Rollback and live data
+
+This release contains no database migration, destructive operation or live data
+import. Existing JSON rows, photos and identities are not rewritten. Before any
+future database change, follow `supabase/BACKUPS.md` and prove restore to an isolated
+project. A recoverable live backup has NOT been verified by this coding session.
+The pre-change deployed commit is `5bf923a`; revert this release's commit and
+redeploy if required, keeping stored data intact. Earlier code ignores the optional
+new JSON reading fields. Do not restore an old database just to roll back the UI.
+
+Live handwriting omissions cannot be repaired from aggregate numbers. Compare
+originals with saved readings, resolve ambiguous names and edit the existing
+result. No historical name corrections or estimated missing finishes are applied.
+
+The Weekly Overview image-content selector also offers Tables only and Player
+leaders, for an optional two-image Facebook post at the same high resolution.

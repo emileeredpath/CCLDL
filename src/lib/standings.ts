@@ -18,6 +18,7 @@ export function standings(
   competition: Result["competition"],
   cutoff: string,
   season = "2026/27",
+  teams: string[] = [],
 ) {
   const rows = new Map<
     string,
@@ -31,7 +32,19 @@ export function standings(
       gamesAgainst: number;
     }
   >();
-  for (const r of results.filter(
+  for (const team of teams)
+    rows.set(team, {
+      team,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      gamesFor: 0,
+      gamesAgainst: 0,
+    });
+  for (const r of [
+    ...new Map(results.map((r) => [r.fixtureId ?? r.id, r])).values(),
+  ].filter(
     (r) =>
       r.approved &&
       r.competition === competition &&
@@ -60,12 +73,12 @@ export function standings(
       rows.set(team, row);
     }
   }
-  // League points confirmed by committee; no additional tie-break rule.
-  return [...rows.values()].sort(
-    (a, b) =>
-      (competition === "league" ? b.gamesFor - a.gamesFor : 0) ||
-      a.team.localeCompare(b.team),
-  );
+  return [...rows.values()]
+    .map((r) => ({
+      ...r,
+      points: competition === "cup" ? r.won * 2 + r.drawn : r.gamesFor,
+    }))
+    .sort((a, b) => b.points - a.points || a.team.localeCompare(b.team));
 }
 export function gameTypes(competition: "league" | "cup") {
   return competition === "cup"

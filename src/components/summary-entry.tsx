@@ -92,6 +92,12 @@ export default function SummaryEntry({
         Leave unused boxes blank.
       </p>
       {value.notes && <p className="notice">{value.notes}</p>}
+      {value.ocr_review && (
+        <details>
+          <summary>Reviewed OCR transcription</summary>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{value.ocr_review.text}</pre>
+        </details>
+      )}
       {value.pending_achievements?.map((pending, index) => (
         <div className="notice" key={`${pending.name}:${index}`}>
           <strong>Player to confirm: {pending.name}</strong>
@@ -202,6 +208,12 @@ export default function SummaryEntry({
                     j === i
                       ? {
                           player_id: id,
+                          recorded_scores: a.player_id
+                            ? undefined
+                            : a.recorded_scores,
+                          recorded_checkouts: a.player_id
+                            ? undefined
+                            : a.recorded_checkouts,
                           side:
                             players.find((x) => x.id === id)?.side ?? "home",
                           double_ones: a.player_id ? 0 : a.double_ones,
@@ -223,7 +235,14 @@ export default function SummaryEntry({
               <label key={key}>
                 {["Double 1s", "Highest score", "Highest checkout"][j]}
                 <input
-                  readOnly={readOnly}
+                  readOnly={
+                    readOnly ||
+                    (key === "highest_score"
+                      ? Boolean(p.recorded_scores?.length)
+                      : key === "highest_checkout"
+                        ? Boolean(p.recorded_checkouts?.length)
+                        : false)
+                  }
                   type="number"
                   inputMode="numeric"
                   min={key === "double_ones" ? 0 : 1}
@@ -251,6 +270,95 @@ export default function SummaryEntry({
               </label>
             ))}
           </div>
+          {(
+            [
+              ["recorded_scores", "highest_score", "scores", 180],
+              ["recorded_checkouts", "highest_checkout", "checkouts", 170],
+            ] as const
+          ).map(([records, best, label, max]) => (
+            <details key={records}>
+              <summary>
+                All recorded {label} ({p[records]?.length ?? (p[best] ? 1 : 0)})
+              </summary>
+              {(p[records] ?? (p[best] ? [p[best]!] : [])).map((n, j) => (
+                <div className="actions" key={j}>
+                  <label>
+                    {label} reading {j + 1}
+                    <input
+                      readOnly={readOnly}
+                      type="number"
+                      min={1}
+                      max={max}
+                      value={n || ""}
+                      onChange={(e) => {
+                        const values = [...(p[records] ?? [p[best]!])];
+                        values[j] = Number(e.target.value);
+                        onChange({
+                          ...value,
+                          achievements: value.achievements.map((a, k) =>
+                            k === i
+                              ? {
+                                  ...a,
+                                  [records]: values,
+                                  [best]: Math.max(...values) || null,
+                                }
+                              : a,
+                          ),
+                        });
+                      }}
+                    />
+                  </label>
+                  {!readOnly && (
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        const values = (p[records] ?? [p[best]!]).filter(
+                          (_, k) => k !== j,
+                        );
+                        onChange({
+                          ...value,
+                          achievements: value.achievements.map((a, k) =>
+                            k === i
+                              ? {
+                                  ...a,
+                                  [records]: values,
+                                  [best]: Math.max(0, ...values) || null,
+                                }
+                              : a,
+                          ),
+                        });
+                      }}
+                    >
+                      Remove reading
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!readOnly && (
+                <button
+                  className="secondary"
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      achievements: value.achievements.map((a, k) =>
+                        k === i
+                          ? {
+                              ...a,
+                              [records]: [
+                                ...(a[records] ?? (a[best] ? [a[best]!] : [])),
+                                0,
+                              ],
+                            }
+                          : a,
+                      ),
+                    })
+                  }
+                >
+                  Add another {label === "scores" ? "score" : "checkout"}
+                </button>
+              )}
+            </details>
+          ))}
           {!readOnly && (
             <button
               className="secondary"

@@ -16,12 +16,18 @@ import {
   ChevronRight,
   Users,
 } from "lucide-react";
+import {
+  playerStatistics,
+  rankedStats,
+  type PlayerStat,
+} from "@/lib/player-statistics";
 import { toPng } from "html-to-image";
 import { normalise } from "@/lib/player-csv";
 import PlayerCsvImport from "@/components/player-csv-import";
 import MatchSummary from "@/components/match-summary";
 import PosterPreview from "@/components/poster-preview";
 import WeeklyPoster from "@/components/weekly-poster";
+import SheetScanner from "@/components/sheet-scanner";
 import SummaryEntry from "@/components/summary-entry";
 import {
   emptySummary,
@@ -78,7 +84,7 @@ type Sheet = {
   storage_path: string;
   created_at: string;
 };
-type Stat = { team?: string; name: string; d1: number; score: number; checkout: number };
+type Stat = PlayerStat;
 function dateLabel(date: string) {
   return new Date(date + "T12:00:00").toLocaleDateString("en-GB", {
     day: "numeric",
@@ -118,17 +124,27 @@ function Table({
   season,
   breakdown = false,
   full = false,
+  teamNames = [],
 }: {
   breakdown?: boolean;
   full?: boolean;
+  teamNames?: string[];
   results: Result[];
   competition: "league" | "cup";
   cutoff: string;
   season: string;
 }) {
-  const rows = standings(results, competition, cutoff, season);
+  const rows = standings(results, competition, cutoff, season, teamNames);
   const kinds = ["Pairs", "Trebles", "Singles", "Captains & vice"];
-  const totals = kinds.map((kind) => new Map(categoryStandings(results, kind, season, cutoff).map((r) => [r.name, r.value])));
+  const totals = kinds.map(
+    (kind) =>
+      new Map(
+        categoryStandings(results, kind, season, cutoff).map((r) => [
+          r.name,
+          r.value,
+        ]),
+      ),
+  );
   return (
     <>
       <div className="table-wrap">
@@ -137,11 +153,25 @@ function Table({
             <tr>
               <th>Team</th>
               <th>Played</th>
-              {full && <><th>Won</th><th>Drawn</th><th>Lost</th></>}
-              {competition === "cup" && <th>Won</th>}
-              {!breakdown && <th>Lost</th>}
+              {full && (
+                <>
+                  <th>Won</th>
+                  <th>Drawn</th>
+                  <th>Lost</th>
+                </>
+              )}
+              {competition === "cup" && (
+                <>
+                  <th>Won</th>
+                  <th>Drawn</th>
+                  <th>Lost</th>
+                  <th>Legs for</th>
+                  <th>Legs against</th>
+                </>
+              )}
+              {!breakdown && competition === "league" && <th>Lost</th>}
               {breakdown && kinds.map((kind) => <th key={kind}>{kind}</th>)}
-              {competition === "league" && <th>{breakdown ? "Total points" : "Points"}</th>}
+              <th>Total points</th>
             </tr>
           </thead>
           <tbody>
@@ -149,15 +179,32 @@ function Table({
               <tr key={r.team}>
                 <td style={{ fontWeight: 600 }}>{r.team}</td>
                 <td>{r.played}</td>
-                {full && <><td>{r.won}</td><td>{r.drawn}</td><td>{r.lost}</td></>}
-                {competition === "cup" && <td>{r.gamesFor}</td>}
-                {!breakdown && <td>{r.gamesAgainst}</td>}
-                {breakdown && kinds.map((kind, i) => <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>)}
-                {competition === "league" && (
-                  <td style={{ color: "var(--pink)", fontWeight: 700 }}>
-                    {r.gamesFor}
-                  </td>
+                {full && (
+                  <>
+                    <td>{r.won}</td>
+                    <td>{r.drawn}</td>
+                    <td>{r.lost}</td>
+                  </>
                 )}
+                {competition === "cup" && (
+                  <>
+                    <td>{r.won}</td>
+                    <td>{r.drawn}</td>
+                    <td>{r.lost}</td>
+                    <td>{r.gamesFor}</td>
+                    <td>{r.gamesAgainst}</td>
+                  </>
+                )}
+                {!breakdown && competition === "league" && (
+                  <td>{r.gamesAgainst}</td>
+                )}
+                {breakdown &&
+                  kinds.map((kind, i) => (
+                    <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>
+                  ))}
+                <td style={{ color: "var(--pink)", fontWeight: 700 }}>
+                  {r.points}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -171,10 +218,10 @@ function Table({
       <p className="muted" style={{ fontSize: 11 }}>
         {competition === "league"
           ? "Most points first · Equal points are tied · "
-          : "Alphabetical display · "}{" "}
+          : "Most points first · Equal points are tied · "}{" "}
         {competition === "league"
           ? "Points = Pairs + Trebles + Singles + Captains & vice."
-          : "Game totals only. Cup points and ranking await confirmation."}
+          : "Cup: win 2 points · draw 1 · loss 0."}
       </p>
     </>
   );
@@ -206,6 +253,7 @@ export default function Workspace() {
   const [teamFilter, setTeamFilter] = useState("");
   const [archiveDate, setArchiveDate] = useState("");
   const [viewedFixtureId, setViewedFixtureId] = useState("");
+  const [resultFixtureSearch, setResultFixtureSearch] = useState("");
   const [fixtureId, setFixtureId] = useState("");
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -217,6 +265,9 @@ export default function Workspace() {
   const [review, setReview] = useState(false);
   const [archivePreview, setArchivePreview] = useState("");
   const [history, setHistory] = useState<string[]>([]);
+  const [posterPart, setPosterPart] = useState<"all" | "tables" | "players">(
+    "all",
+  );
   const weeklyRef = useRef<HTMLDivElement>(null);
   const nav: { name: Screen; icon: typeof Home }[] = [
     { name: "Home", icon: Home },
@@ -226,6 +277,13 @@ export default function Workspace() {
 
     { name: "Results", icon: ImageIcon },
     { name: "Weekly Overview", icon: Download },
+  ];
+  const seasonTeamNames = [
+    ...new Set(
+      fixtures
+        .filter((f) => demo || f.season === season)
+        .flatMap((f) => [f.home, f.away]),
+    ),
   ];
   const selected = fixtures.find((f) => f.id === fixtureId);
   async function load() {
@@ -266,96 +324,68 @@ export default function Workspace() {
       away_team_id: f.away_team_id,
     }));
     setFixtures(fs);
-    setResults(
-      (responses[4].data ?? []).map((r) => {
-        const f = fs.find((f) => f.id === r.fixture_id)!;
-        return {
-          id: r.id,
-          season: f?.season ?? "",
-          competition: f?.competition as "league" | "cup",
-          date: f?.date ?? "",
-          home: f?.home ?? "",
-          away: f?.away ?? "",
-          summary: r.summary,
-          achievements: Object.values(
-            r.games
-              .flatMap((g: { game_players: PlayerEntry[] }) => g.game_players)
-              .reduce((acc: Record<string, PlayerEntry>, p: PlayerEntry) => {
-                const old = acc[p.player_id];
-                acc[p.player_id] = {
-                  ...p,
-                  double_ones: (old?.double_ones ?? 0) + p.double_ones,
-                  highest_score:
-                    Math.max(old?.highest_score ?? 0, p.highest_score ?? 0) ||
-                    null,
-                  highest_checkout:
-                    Math.max(
-                      old?.highest_checkout ?? 0,
-                      p.highest_checkout ?? 0,
-                    ) || null,
-                };
-                return acc;
-              }, {}),
-          ) as PlayerEntry[],
-          fixtureId: r.fixture_id,
-          breakdown:
-            r.summary?.counts ??
-            Object.fromEntries(
-              categories(f?.competition === "cup").map(([kind]) => [
-                kind,
-                r.games.filter(
-                  (g: Game) => g.kind === kind && g.winner === "home",
-                ).length,
-              ]),
-            ),
-          homeWins: r.summary
-            ? Object.values(r.summary.counts as Record<string, number>).reduce(
-                (a, b) => a + b,
-                0,
-              )
-            : r.games.filter((g: { winner: string }) => g.winner === "home")
-                .length,
-          awayWins: r.summary
-            ? 12 -
-              Object.values(r.summary.counts as Record<string, number>).reduce(
-                (a, b) => a + b,
-                0,
-              )
-            : r.games.filter((g: { winner: string }) => g.winner === "away")
-                .length,
-          approved: r.status === "approved",
-        };
-      }),
-    );
+    const mappedResults: Result[] = (responses[4].data ?? []).map((r) => {
+      const f = fs.find((f) => f.id === r.fixture_id)!;
+      return {
+        id: r.id,
+        season: f?.season ?? "",
+        competition: f?.competition as "league" | "cup",
+        date: f?.date ?? "",
+        home: f?.home ?? "",
+        away: f?.away ?? "",
+        summary: r.summary,
+        achievements: Object.values(
+          r.games
+            .flatMap((g: { game_players: PlayerEntry[] }) => g.game_players)
+            .reduce((acc: Record<string, PlayerEntry>, p: PlayerEntry) => {
+              const old = acc[p.player_id];
+              acc[p.player_id] = {
+                ...p,
+                double_ones: (old?.double_ones ?? 0) + p.double_ones,
+                highest_score:
+                  Math.max(old?.highest_score ?? 0, p.highest_score ?? 0) ||
+                  null,
+                highest_checkout:
+                  Math.max(
+                    old?.highest_checkout ?? 0,
+                    p.highest_checkout ?? 0,
+                  ) || null,
+              };
+              return acc;
+            }, {}),
+        ) as PlayerEntry[],
+        fixtureId: r.fixture_id,
+        breakdown:
+          r.summary?.counts ??
+          Object.fromEntries(
+            categories(f?.competition === "cup").map(([kind]) => [
+              kind,
+              r.games.filter(
+                (g: Game) => g.kind === kind && g.winner === "home",
+              ).length,
+            ]),
+          ),
+        homeWins: r.summary
+          ? Object.values(r.summary.counts as Record<string, number>).reduce(
+              (a, b) => a + b,
+              0,
+            )
+          : r.games.filter((g: { winner: string }) => g.winner === "home")
+              .length,
+        awayWins: r.summary
+          ? 12 -
+            Object.values(r.summary.counts as Record<string, number>).reduce(
+              (a, b) => a + b,
+              0,
+            )
+          : r.games.filter((g: { winner: string }) => g.winner === "away")
+              .length,
+        approved: r.status === "approved",
+      };
+    });
+    setResults(mappedResults);
     setSheets((responses[5].data ?? []).filter((s) => !s.removed_at));
-    const totals = new Map<string, Stat>();
-    for (const r of responses[4].data ?? []) {
-      const f = fs.find((f) => f.id === r.fixture_id);
-      if (
-        r.status !== "approved" ||
-        f?.season !== season ||
-        f.competition !== competition ||
-        f.date > week
-      )
-        continue;
-      for (const p of r.summary?.achievements ??
-        r.games.flatMap(
-          (g: { game_players: PlayerEntry[] }) => g.game_players,
-        )) {
-        const row = totals.get(p.player_id) ?? {
-          name: ps.find((x) => x.id === p.player_id)?.name ?? "Unknown player",
-          team: ts.find((t) => t.id === ps.find((x) => x.id === p.player_id)?.team_id)?.name,
-          d1: 0,
-          score: 0,
-          checkout: 0,
-        };
-        row.d1 += p.double_ones;
-        row.score = Math.max(row.score, p.highest_score ?? 0);
-        row.checkout = Math.max(row.checkout, p.highest_checkout ?? 0);
-        totals.set(p.player_id, row);
-      }
-    }
-    setStats([...totals.values()]);
+    setStats(playerStatistics(mappedResults, ps, ts, season, week));
     setLoadedScope([season, competition, week].join(":"));
   }
   useEffect(() => {
@@ -456,6 +486,38 @@ export default function Workspace() {
       })),
     );
   }
+  async function useSavedPhoto() {
+    if (!client || !sheetId || busy) return;
+    const saved = sheets.find((s) => s.id === sheetId);
+    if (!saved) return;
+    setBusy(true);
+    try {
+      const signed = await client.storage
+        .from("result-sheets")
+        .createSignedUrl(saved.storage_path, 60);
+      if (signed.error) throw new Error(signed.error.message);
+      const response = await fetch(signed.data.signedUrl, {
+        cache: "no-store",
+      });
+      if (!response.ok)
+        throw new Error("Could not open the saved original. Please retry.");
+      const blob = await response.blob();
+      setFile(
+        new File(
+          [blob],
+          saved.storage_path.split("/").pop() ?? "original.jpg",
+          { type: blob.type },
+        ),
+      );
+      setMessage(
+        "Original loaded for local review. Rescanning reuses this archived photograph.",
+      );
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Could not load original.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function upload() {
     if (!client || !file || !selected) return null;
     setBusy(true);
@@ -489,7 +551,10 @@ export default function Workspace() {
       await load();
       return row.data.id as string;
     } catch (e) {
-      const reason = e instanceof Error ? e.message : "Photo upload failed. Please try again.";
+      const reason =
+        e instanceof Error
+          ? e.message
+          : "Photo upload failed. Please try again.";
       setMessage(reason);
       setSaveError(reason);
       return null;
@@ -574,7 +639,9 @@ export default function Workspace() {
     if (!client || !selected || busy) return;
     setSaveError("");
     if (!sheetId && !file) {
-      setSaveError("Choose the original photograph above before saving this result.");
+      setSaveError(
+        "Choose the original photograph above before saving this result.",
+      );
       return;
     }
     setBusy(true);
@@ -603,7 +670,8 @@ export default function Workspace() {
         .eq("fixture_id", selected.id)
         .single();
       if (verification.error || verification.data?.status !== "approved") {
-        const notice = "Your save was accepted, but we couldn't confirm it by reloading. Check Results before saving again.";
+        const notice =
+          "Your save was accepted, but we couldn't confirm it by reloading. Check Results before saving again.";
         setMessage(notice);
         setSaveError(notice);
         return;
@@ -616,7 +684,10 @@ export default function Workspace() {
       setViewedFixtureId(selected.id);
       setScreen("Match summary");
     } catch (e) {
-      const reason = e instanceof Error ? e.message : "The database could not save this result. Please try again.";
+      const reason =
+        e instanceof Error
+          ? e.message
+          : "The database could not save this result. Please try again.";
       setSaveError(reason);
       setMessage(reason);
     } finally {
@@ -656,23 +727,48 @@ export default function Workspace() {
   }
   async function removeSheet(sheet: Sheet) {
     if (!client || busy || demo) return;
-    if (!window.confirm("Remove this extra photograph from the results list? The original file is retained securely for the edit history.")) return;
+    if (
+      !window.confirm(
+        "Remove this extra photograph from the results list? The original file is retained securely for the edit history.",
+      )
+    )
+      return;
     setBusy(true);
-    const { error } = await client.rpc("remove_result_sheet", { p_sheet: sheet.id });
+    const { error } = await client.rpc("remove_result_sheet", {
+      p_sheet: sheet.id,
+    });
     if (error) {
-      window.alert(error.code === "PGRST202" ? "Photo removal needs the latest database update first." : error.message);
+      window.alert(
+        error.code === "PGRST202"
+          ? "Photo removal needs the latest database update first."
+          : error.message,
+      );
     } else {
       setSheets((current) => current.filter((s) => s.id !== sheet.id));
       setArchivePreview("");
-      setMessage("Extra photograph removed from the results list. Your scores are unchanged.");
+      setMessage(
+        "Extra photograph removed from the results list. Your scores are unchanged.",
+      );
     }
     setBusy(false);
   }
   function sheetButtons(s: Sheet, label: string) {
-    return <span className="sheet-actions" key={s.id}>
-      <button className="secondary" onClick={() => openSheet(s)}>{label}</button>
-      <button className="remove-sheet" disabled={demo || busy} aria-label={`Remove ${label}`} title="Remove extra photograph" onClick={() => removeSheet(s)}>×</button>
-    </span>;
+    return (
+      <span className="sheet-actions" key={s.id}>
+        <button className="secondary" onClick={() => openSheet(s)}>
+          {label}
+        </button>
+        <button
+          className="remove-sheet"
+          disabled={demo || busy}
+          aria-label={`Remove ${label}`}
+          title="Remove extra photograph"
+          onClick={() => removeSheet(s)}
+        >
+          ×
+        </button>
+      </span>
+    );
   }
   async function openSheet(sheet: Sheet) {
     if (!client) return;
@@ -805,16 +901,18 @@ export default function Workspace() {
       {!statsReady ? (
         <p className="muted">Loading statistics…</p>
       ) : stats.some((s) => s[key] > 0) ? (
-        [...stats]
-          .filter((s) => s[key] > 0)
-          .sort((a, b) => b[key] - a[key] || a.name.localeCompare(b.name))
-
-          .map((s) => (
-            <div className="result-row" key={s.name}>
-              <span><strong>{s.name}</strong>{s.team && <small className="player-team">{s.team}</small>}</span>
-              <strong className="score">{s[key]}</strong>
-            </div>
-          ))
+        rankedStats(stats, key).map((s) => (
+          <div className="result-row" key={s.id}>
+            <span>
+              <strong>
+                {s.joint ? "=" : ""}
+                {s.rank}. {s.name}
+              </strong>
+              {s.team && <small className="player-team">{s.team}</small>}
+            </span>
+            <strong className="score">{s[key]}</strong>
+          </div>
+        ))
       ) : (
         <div className="empty">No approved player statistics yet.</div>
       )}
@@ -941,33 +1039,54 @@ export default function Workspace() {
           <>
             {results.some((r) => r.season === season && !r.approved) && (
               <div className="card review-queue">
-                <div className="card-head"><div><span className="eyebrow">Finish your results</span><h2>Saved drafts to check</h2></div><span className="badge">Not yet in tables</span></div>
-                {results.filter((r) => r.season === season && !r.approved).map((r) => (
-                  <button className="draft-row" key={r.id} disabled={busy} onClick={() => editResult(r.id)}>
-                    <span><strong>{r.home} v {r.away}</strong><small>{dateLabel(r.date)} · Check & approve</small></span>
-                    <span className="score">{r.homeWins} – {r.awayWins}</span>
-                  </button>
-                ))}
+                <div className="card-head">
+                  <div>
+                    <span className="eyebrow">Finish your results</span>
+                    <h2>Saved drafts to check</h2>
+                  </div>
+                  <span className="badge">Not yet in tables</span>
+                </div>
+                {results
+                  .filter((r) => r.season === season && !r.approved)
+                  .map((r) => (
+                    <button
+                      className="draft-row"
+                      key={r.id}
+                      disabled={busy}
+                      onClick={() => editResult(r.id)}
+                    >
+                      <span>
+                        <strong>
+                          {r.home} v {r.away}
+                        </strong>
+                        <small>{dateLabel(r.date)} · Check & approve</small>
+                      </span>
+                      <span className="score">
+                        {r.homeWins} – {r.awayWins}
+                      </span>
+                    </button>
+                  ))}
               </div>
             )}
-                <div className="card">
-                  <div className="card-head">
-                    <h2>League table</h2>
-                    <button
-                      className="secondary"
-                      onClick={() => navigate("Tables")}
-                    >
-                      View all <ArrowUpRight size={14} />
-                    </button>
-                  </div>
-                  <Table
-                    results={results}
-                    competition="league"
-                    breakdown
-                    cutoff={week}
-                    season={season}
-                  />
-                </div>
+            <div className="card">
+              <div className="card-head">
+                <h2>League table</h2>
+                <button
+                  className="secondary"
+                  onClick={() => navigate("Tables")}
+                >
+                  View all <ArrowUpRight size={14} />
+                </button>
+              </div>
+              <Table
+                teamNames={seasonTeamNames}
+                results={results}
+                competition="league"
+                breakdown
+                cutoff={week}
+                season={season}
+              />
+            </div>
             <div className="grid">
               <div>
                 <div className="card">
@@ -1002,6 +1121,7 @@ export default function Workspace() {
                 <div className="card">
                   <h2>Cup table</h2>
                   <Table
+                    teamNames={seasonTeamNames}
                     results={results}
                     competition="cup"
                     cutoff={week}
@@ -1045,7 +1165,13 @@ export default function Workspace() {
                 onClick={() =>
                   downloadCSV(
                     `${competition}-${season.replace("/", "-")}.csv`,
-                    standings(results, competition, week, season),
+                    standings(
+                      results,
+                      competition,
+                      week,
+                      season,
+                      seasonTeamNames,
+                    ),
                   )
                 }
               >
@@ -1053,6 +1179,7 @@ export default function Workspace() {
               </button>
             </div>
             <Table
+              teamNames={seasonTeamNames}
               results={results}
               competition={competition}
               full={competition === "league"}
@@ -1098,10 +1225,36 @@ export default function Workspace() {
               </div>
             )}
             <h2>Player statistics</h2>
+            <p className="muted">
+              Cumulative season totals · League and Cup combined · through{" "}
+              {dateLabel(week)}
+            </p>
             <div className="filter-pills" aria-label="Player statistic">
-              {([ ["d1", "Double 1s"], ["score", "Highest score"], ["checkout", "Highest checkout"] ] as const).map(([key, label]) => <button className={statTab === key ? "selected" : ""} aria-pressed={statTab === key} key={key} onClick={() => setStatTab(key)}>{label}</button>)}
+              {(
+                [
+                  ["d1", "Double 1s"],
+                  ["score", "Highest score"],
+                  ["checkout", "Highest checkout"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  className={statTab === key ? "selected" : ""}
+                  aria-pressed={statTab === key}
+                  key={key}
+                  onClick={() => setStatTab(key)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-            {statPanel(statTab, statTab === "d1" ? "Double 1 finishes" : statTab === "score" ? "Highest score" : "Highest checkout")}
+            {statPanel(
+              statTab,
+              statTab === "d1"
+                ? "Double 1 finishes"
+                : statTab === "score"
+                  ? "Highest score"
+                  : "Highest checkout",
+            )}
             <button
               className="secondary"
               disabled={!statsReady || !stats.length}
@@ -1169,24 +1322,107 @@ export default function Workspace() {
           <>
             <div className="card schedule-filters">
               <h2>Fixtures & results</h2>
-              <label>Find a team<input value={fixtureSearch} onChange={(e) => setFixtureSearch(e.target.value)} placeholder="Search fixtures" /></label>
+              <label>
+                Find a team
+                <input
+                  value={fixtureSearch}
+                  onChange={(e) => setFixtureSearch(e.target.value)}
+                  placeholder="Search fixtures"
+                />
+              </label>
               <div className="filter-pills" aria-label="Fixture status">
-                {[["all", "All fixtures"], ["approved", "Results"], ["pending", "To enter"]].map(([key,label]) => <button key={key} className={fixtureStatus === key ? "selected" : ""} aria-pressed={fixtureStatus === key} onClick={() => setFixtureStatus(key)}>{label}</button>)}
+                {[
+                  ["all", "All fixtures"],
+                  ["approved", "Results"],
+                  ["pending", "To enter"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    className={fixtureStatus === key ? "selected" : ""}
+                    aria-pressed={fixtureStatus === key}
+                    onClick={() => setFixtureStatus(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-              <button className="secondary" onClick={() => navigate("Teams & players")}>Add a fixture</button>
+              <button
+                className="secondary"
+                onClick={() => navigate("Teams & players")}
+              >
+                Add a fixture
+              </button>
             </div>
             {(() => {
-              const visible = fixtures.filter((f) => (demo || f.season === season) && f.competition === competition && `${f.home} ${f.away}`.toLowerCase().includes(fixtureSearch.toLowerCase()) && (fixtureStatus === "all" || (results.some((r) => r.fixtureId === f.id && r.approved) ? fixtureStatus === "approved" : fixtureStatus === "pending"))).sort((a,b) => a.date.localeCompare(b.date));
-              return visible.length ? [...new Set(visible.map((f) => f.date))].map((date) => <section className="card fixture-round" key={date}>
-                <div className="card-head"><h2>{dateLabel(date)}</h2><span className="badge">{competition === "league" ? "League" : "Cup"}</span></div>
-                {visible.filter((f) => f.date === date).map((f) => {
-                  const saved = results.find((r) => r.fixtureId === f.id || (r.home === f.home && r.away === f.away && r.date === f.date && r.competition === f.competition));
-                  return <button className="fixture-link result-row" key={f.id} onClick={() => {setViewedFixtureId(f.id); navigate("Match summary");}}>
-                    <span><strong>{f.home} vs {f.away}</strong><small className="player-team">{saved ? saved.approved ? "View result & original sheet" : "Draft · finish entering result" : "View match / add result"}</small></span>
-                    <span className="score">{saved ? `${saved.homeWins} – ${saved.awayWins}` : "View"}<ChevronRight size={16} /></span>
-                  </button>;
-                })}
-              </section>) : <p className="empty">No fixtures match these filters.</p>;
+              const visible = fixtures
+                .filter(
+                  (f) =>
+                    (demo || f.season === season) &&
+                    f.competition === competition &&
+                    `${f.home} ${f.away}`
+                      .toLowerCase()
+                      .includes(fixtureSearch.toLowerCase()) &&
+                    (fixtureStatus === "all" ||
+                      (results.some((r) => r.fixtureId === f.id && r.approved)
+                        ? fixtureStatus === "approved"
+                        : fixtureStatus === "pending")),
+                )
+                .sort((a, b) => a.date.localeCompare(b.date));
+              return visible.length ? (
+                [...new Set(visible.map((f) => f.date))].map((date) => (
+                  <section className="card fixture-round" key={date}>
+                    <div className="card-head">
+                      <h2>{dateLabel(date)}</h2>
+                      <span className="badge">
+                        {competition === "league" ? "League" : "Cup"}
+                      </span>
+                    </div>
+                    {visible
+                      .filter((f) => f.date === date)
+                      .map((f) => {
+                        const saved = results.find(
+                          (r) =>
+                            r.fixtureId === f.id ||
+                            (r.home === f.home &&
+                              r.away === f.away &&
+                              r.date === f.date &&
+                              r.competition === f.competition),
+                        );
+                        return (
+                          <button
+                            className="fixture-link result-row"
+                            key={f.id}
+                            onClick={() => {
+                              setViewedFixtureId(f.id);
+                              navigate("Match summary");
+                            }}
+                          >
+                            <span>
+                              <strong>
+                                {f.home} vs {f.away}
+                              </strong>
+                              <small className="player-team">
+                                {saved
+                                  ? saved.approved
+                                    ? "View result & original sheet"
+                                    : "Draft · finish entering result"
+                                  : "View match / add result"}
+                              </small>
+                            </span>
+                            <span className="score">
+                              {saved
+                                ? `${saved.homeWins} – ${saved.awayWins}`
+                                : "View"}
+                              <ChevronRight size={16} />
+                            </span>
+                          </button>
+                        );
+                      })}
+                  </section>
+                ))
+              ) : (
+                <p className="empty">No fixtures match these filters.</p>
+              );
             })()}
           </>
         )}
@@ -1204,6 +1440,16 @@ export default function Workspace() {
           <>
             <div className="card">
               <h2>1. Select the fixture</h2>
+              <label style={{ marginTop: 16 }}>
+                Find fixture by team or date
+                <input
+                  type="search"
+                  value={resultFixtureSearch}
+                  onChange={(e) => setResultFixtureSearch(e.target.value)}
+                  placeholder="Team name or 2026-10-20"
+                  disabled={busy}
+                />
+              </label>
               <label style={{ marginTop: 18 }}>
                 Fixture
                 <select
@@ -1219,7 +1465,14 @@ export default function Workspace() {
                 >
                   <option value="">Choose a fixture</option>
                   {fixtures
-                    .filter((f) => demo || f.season === season)
+                    .filter(
+                      (f) =>
+                        (demo || f.season === season) &&
+                        (f.id === fixtureId ||
+                          `${f.home} ${f.away} ${f.date} ${dateLabel(f.date)}`
+                            .toLowerCase()
+                            .includes(resultFixtureSearch.toLowerCase())),
+                    )
                     .map((f) => (
                       <option value={f.id} key={f.id}>
                         {dateLabel(f.date)} · {f.home} vs {f.away} ·{" "}
@@ -1268,10 +1521,55 @@ export default function Workspace() {
                         : "Save photograph"}
                     </button>
                     {sheetId && (
-                      <span className="badge">Original archived</span>
+                      <>
+                        <span className="badge">Original archived</span>
+                        {!file && (
+                          <button
+                            className="secondary"
+                            disabled={busy}
+                            onClick={useSavedPhoto}
+                          >
+                            Read saved original
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
+                {!detailed && (
+                  <details className="scanner-disclosure">
+                    <summary>Read handwriting (free, experimental)</summary>
+                    <SheetScanner
+                      key={`${fixtureId}:${file?.name}:${file?.lastModified}`}
+                      file={file}
+                      fixture={fixtureId}
+                      cup={selected.competition === "cup"}
+                      home={selected.home}
+                      away={selected.away}
+                      date={selected.date}
+                      current={summary}
+                      players={players
+                        .filter(
+                          (p) =>
+                            p.team_id === selected.home_team_id ||
+                            p.team_id === selected.away_team_id,
+                        )
+                        .map((p) => ({
+                          ...p,
+                          side:
+                            p.team_id === selected.home_team_id
+                              ? "home"
+                              : "away",
+                        }))}
+                      disabled={demo || busy}
+                      onApply={(next) => {
+                        setSummary(next);
+                        setReview(false);
+                        setSaveError("");
+                      }}
+                    />
+                  </details>
+                )}
                 {!detailed && (
                   <div className="card">
                     {!summaryReady && (
@@ -1310,10 +1608,30 @@ export default function Workspace() {
                         }))}
                     />
                     <div className="save-feedback" aria-live="polite">
-                      {saveError && <p className="notice save-error" role="alert">{saveError} Your entries are still here.</p>}
-                      {!formComplete && <p className="notice">Complete the scores and select a saved player for each achievement. Confirm any pending players before approval.</p>}
-                      {review && !sheetId && !file && <p className="notice">One step left: choose the original photograph above to enable approval.</p>}
-                      {review && formComplete && (sheetId || file) && <p className="muted">Ready to save. Approval adds this result and its achievements to the tables.</p>}
+                      {saveError && (
+                        <p className="notice save-error" role="alert">
+                          {saveError} Your entries are still here.
+                        </p>
+                      )}
+                      {!formComplete && (
+                        <p className="notice">
+                          Complete the scores and select a saved player for each
+                          achievement. Confirm any pending players before
+                          approval.
+                        </p>
+                      )}
+                      {review && !sheetId && !file && (
+                        <p className="notice">
+                          One step left: choose the original photograph above to
+                          enable approval.
+                        </p>
+                      )}
+                      {review && formComplete && (sheetId || file) && (
+                        <p className="muted">
+                          Ready to save. Approval adds this result and its
+                          achievements to the tables.
+                        </p>
+                      )}
                     </div>
                     <div className="actions result-actions">
                       {!review &&
@@ -1568,7 +1886,9 @@ export default function Workspace() {
                       </button>
                       {sheets
                         .filter((s) => s.fixture_id === r.fixtureId)
-                        .map((s, i) => sheetButtons(s, `Original photo ${i + 1}`))}
+                        .map((s, i) =>
+                          sheetButtons(s, `Original photo ${i + 1}`),
+                        )}
                     </div>
                   </div>
                 ))}
@@ -1657,6 +1977,21 @@ export default function Workspace() {
                     onChange={(e) => setWeek(e.target.value)}
                   />
                 </label>
+                <label>
+                  Image content
+                  <select
+                    value={posterPart}
+                    onChange={(e) =>
+                      setPosterPart(e.target.value as typeof posterPart)
+                    }
+                  >
+                    <option value="all">Everything · one PNG</option>
+                    <option value="tables">Tables only · image 1 of 2</option>
+                    <option value="players">
+                      Player leaders · image 2 of 2
+                    </option>
+                  </select>
+                </label>
                 <div style={{ alignSelf: "end" }}>
                   <button
                     className="primary"
@@ -1669,7 +2004,7 @@ export default function Workspace() {
                           backgroundColor: "#ffffff",
                         });
                         const a = document.createElement("a");
-                        a.download = `CCLDL-${week}${demo ? "-DEMO" : ""}.png`;
+                        a.download = `CCLDL-${week}-${posterPart}${demo ? "-DEMO" : ""}.png`;
                         a.href = url;
                         a.click();
                       } catch {
@@ -1692,6 +2027,8 @@ export default function Workspace() {
             </div>
             <PosterPreview posterRef={weeklyRef}>
               <WeeklyPoster
+                part={posterPart}
+                teamNames={seasonTeamNames}
                 results={results}
                 stats={stats}
                 season={season}

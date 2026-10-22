@@ -74,7 +74,7 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
   ).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: "The Pitt Stop Madhouse Trophy Double 1 finishes",
+      name: "Most Double 1s The Pitt Stop Madhouse Trophy · Top five players",
     }),
   ).toBeVisible();
   const download = page.waitForEvent("download");
@@ -82,7 +82,8 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
   const d = await download;
   await d.saveAs("test-results/weekly.png");
   const png = fs.readFileSync("test-results/weekly.png");
-  expect(png.readUInt32BE(16)).toBeGreaterThan(png.readUInt32BE(20));
+  expect(png.readUInt32BE(16)).toBe(2160);
+  expect(png.readUInt32BE(20)).toBeGreaterThan(2000);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -112,3 +113,30 @@ test("Desktop dashboard and PWA assets", async ({ page, request }) => {
   );
   expect((await request.get("http://127.0.0.1:3000/sw.js")).ok()).toBe(true);
 });
+
+for (const width of [375, 390])
+  test(`Phone ${width}px fits dashboard, fixtures, result entry and tables`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("http://127.0.0.1:3001");
+    const nav = page.getByRole("navigation", { name: "Main navigation" });
+    for (const name of ["Home", "Fixtures", "Tables", "Add Result"]) {
+      await nav.getByRole("button", { name, exact: true }).click();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+    }
+    await page.getByRole("combobox", { name: /^Fixture/ }).selectOption("f1");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: `test-results/entry-${width}.png`,
+      fullPage: true,
+    });
+  });

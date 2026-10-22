@@ -1,4 +1,6 @@
 export type EntryPlayer = {
+  recorded_scores?: number[];
+  recorded_checkouts?: number[];
   player_id: string;
   side: "home" | "away";
   double_ones: number;

@@ -40,6 +40,7 @@ const summary = {
       double_ones: 2,
       highest_score: 140,
       highest_checkout: null,
+      recorded_scores: [100,140],
     },
   ],
 };
@@ -49,6 +50,7 @@ const save = (s, sheet = "00000000-0000-0000-0000-000000000006") =>
     [sheet, JSON.stringify(s)],
   );
 await save(summary);
+assert.deepEqual((await db.query("select summary from results limit 1")).rows[0].summary.achievements[0].recorded_scores,[100,140]);
 assert.equal(
   (await db.query("select status from results")).rows[0].status,
   "approved",
