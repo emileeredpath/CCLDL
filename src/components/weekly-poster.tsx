@@ -1,3 +1,4 @@
+import { categoryStandings } from "@/lib/result-summary";
 import { standings, type Result } from "@/lib/standings";
 import { rankedStats, type PlayerStat } from "@/lib/player-statistics";
 export type PosterStat = PlayerStat;
@@ -21,6 +22,16 @@ export default function WeeklyPoster({
   teamNames?: string[];
   part?: "all" | "tables" | "players";
 }) {
+  const kinds = ["Pairs", "Trebles", "Captains & vice", "Singles"];
+  const categoryPoints = kinds.map(
+    (kind) =>
+      new Map(
+        categoryStandings(results, kind, season, week).map((r) => [
+          r.name,
+          r.value,
+        ]),
+      ),
+  );
   return (
     <>
       <header className="poster-header">
@@ -62,7 +73,15 @@ export default function WeeklyPoster({
                           <th>LA</th>
                         </>
                       )}
-                      <th>Pts</th>
+                      {comp === "league" && (
+                        <>
+                          <th>Pairs</th>
+                          <th>Trebles</th>
+                          <th>C&amp;V</th>
+                          <th>Singles</th>
+                        </>
+                      )}
+                      <th>Total pts</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -86,6 +105,12 @@ export default function WeeklyPoster({
                             <td>{r.gamesAgainst}</td>
                           </>
                         )}
+                        {comp === "league" &&
+                          categoryPoints.map((points, i) => (
+                            <td key={kinds[i]}>
+                              {points.get(r.team) ?? (r.played ? "—" : 0)}
+                            </td>
+                          ))}
                         <td>{r.points}</td>
                       </tr>
                     ))}
@@ -142,7 +167,7 @@ export default function WeeklyPoster({
           ? `INCOMPLETE: ${incomplete} scheduled matches still need approved results.`
           : "All entered fixtures through this date have approved results."}
         <br />P played · W won · D drawn · L lost · LF/LA legs for/against · Pts
-        points.
+        points. C&V captains & vice. — category breakdown not recorded.
         <br />
         Equal points remain tied. Joint player positions use =. Five players per
         list; equal values ordered by name. Full statistics remain in the

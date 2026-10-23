@@ -247,6 +247,7 @@ export default function Workspace() {
   const [season, setSeason] = useState("2026/27");
   const [competition, setCompetition] = useState<"league" | "cup">("league");
   const [week, setWeek] = useState(new Date().toISOString().slice(0, 10));
+  const [fixtureCompetition, setFixtureCompetition] = useState("all");
   const [fixtureSearch, setFixtureSearch] = useState("");
   const [fixtureStatus, setFixtureStatus] = useState("all");
   const [statTab, setStatTab] = useState<"d1" | "score" | "checkout">("d1");
@@ -1017,9 +1018,7 @@ export default function Workspace() {
                 ))}
               </select>
             </label>
-            {["Tables", "Results", "Fixtures", "Weekly Overview"].includes(
-              screen,
-            ) && (
+            {["Tables", "Results", "Weekly Overview"].includes(screen) && (
               <label>
                 Competition
                 <select
@@ -1323,6 +1322,17 @@ export default function Workspace() {
             <div className="card schedule-filters">
               <h2>Fixtures & results</h2>
               <label>
+                Fixture competition
+                <select
+                  value={fixtureCompetition}
+                  onChange={(e) => setFixtureCompetition(e.target.value)}
+                >
+                  <option value="all">League & Cup — all fixtures</option>
+                  <option value="league">League</option>
+                  <option value="cup">Cup</option>
+                </select>
+              </label>
+              <label>
                 Find a team
                 <input
                   value={fixtureSearch}
@@ -1358,7 +1368,8 @@ export default function Workspace() {
                 .filter(
                   (f) =>
                     (demo || f.season === season) &&
-                    f.competition === competition &&
+                    (fixtureCompetition === "all" ||
+                      f.competition === fixtureCompetition) &&
                     `${f.home} ${f.away}`
                       .toLowerCase()
                       .includes(fixtureSearch.toLowerCase()) &&
@@ -1374,7 +1385,7 @@ export default function Workspace() {
                     <div className="card-head">
                       <h2>{dateLabel(date)}</h2>
                       <span className="badge">
-                        {competition === "league" ? "League" : "Cup"}
+                        {visible.filter((f) => f.date === date).length} fixtures
                       </span>
                     </div>
                     {visible
@@ -1402,6 +1413,9 @@ export default function Workspace() {
                                 {f.home} vs {f.away}
                               </strong>
                               <small className="player-team">
+                                {f.competition === "cup"
+                                  ? "Cup · "
+                                  : "League · "}
                                 {saved
                                   ? saved.approved
                                     ? "View result & original sheet"
@@ -2159,6 +2173,52 @@ function SetupForms({
 }) {
   const [busy, setBusy] = useState(false);
   const [rosterSearch, setRosterSearch] = useState("");
+  const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
+  const [playerName, setPlayerName] = useState("");
+  async function renamePlayer(e: FormEvent<HTMLFormElement>, player: Option) {
+    e.preventDefault();
+    if (!client || !clientReady || busy) return;
+    const name = playerName.trim().replace(/\s+/g, " ");
+    if (!name || name.length > 100) {
+      notify("Enter a player name of 1–100 characters.");
+      return;
+    }
+    if (
+      players.some(
+        (p) =>
+          p.id !== player.id &&
+          p.team_id === player.team_id &&
+          p.name.trim().toLowerCase() === name.toLowerCase(),
+      )
+    ) {
+      notify(
+        "This team already has a player with that name. Check the existing player first.",
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data, error } = await client
+        .from("players")
+        .update({ name })
+        .eq("id", player.id)
+        .select("id")
+        .single();
+      if (error || !data)
+        throw new Error(error?.message || "The name could not be saved.");
+      await reload();
+      setEditingPlayer(null);
+      notify("Player name updated. Their results and statistics stay linked.");
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Could not save the player name. Try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   async function submit(e: FormEvent<HTMLFormElement>, table: string) {
     e.preventDefault();
     if (!client || !clientReady) return;
@@ -2228,7 +2288,53 @@ function SetupForms({
                             .includes(rosterSearch.toLowerCase()),
                       )
                       .map((p) => (
-                        <li key={p.id}>{p.name}</li>
+                        <li key={p.id} className="roster-player">
+                          {editingPlayer === p.id ? (
+                            <form onSubmit={(e) => renamePlayer(e, p)}>
+                              <label>
+                                Correct player name
+                                <input
+                                  value={playerName}
+                                  onChange={(e) =>
+                                    setPlayerName(e.target.value)
+                                  }
+                                  required
+                                  maxLength={100}
+                                  autoFocus
+                                />
+                              </label>
+                              <div className="actions">
+                                <button disabled={busy || !playerName.trim()}>
+                                  Save name
+                                </button>
+                                <button
+                                  type="button"
+                                  className="secondary"
+                                  disabled={busy}
+                                  onClick={() => setEditingPlayer(null)}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </form>
+                          ) : (
+                            <>
+                              <span>{p.name}</span>
+                              <button
+                                type="button"
+                                className="secondary"
+                                aria-label={`Edit ${p.name}`}
+                                disabled={!clientReady || busy}
+                                onClick={() => {
+                                  setEditingPlayer(p.id);
+                                  setPlayerName(p.name);
+                                }}
+                              >
+                                Edit name
+                              </button>
+                            </>
+                          )}
+                        </li>
                       ))}
                   </ul>
                 ) : (

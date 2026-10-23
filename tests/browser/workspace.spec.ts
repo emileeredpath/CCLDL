@@ -82,7 +82,7 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
   const d = await download;
   await d.saveAs("test-results/weekly.png");
   const png = fs.readFileSync("test-results/weekly.png");
-  expect(png.readUInt32BE(16)).toBe(2160);
+  expect(png.readUInt32BE(16)).toBe(3200);
   expect(png.readUInt32BE(20)).toBeGreaterThan(2000);
   expect(
     await page.evaluate(

@@ -247,7 +247,10 @@ export default function SummaryEntry({
                   inputMode="numeric"
                   min={key === "double_ones" ? 0 : 1}
                   max={[999, 180, 170][j]}
-                  value={p[key] ?? ""}
+                  value={
+                    key === "double_ones" && p[key] === 0 ? "" : (p[key] ?? "")
+                  }
+                  placeholder={key === "double_ones" ? "0" : undefined}
                   onChange={(e) =>
                     onChange({
                       ...value,

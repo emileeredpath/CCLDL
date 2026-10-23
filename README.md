@@ -173,8 +173,8 @@ the existing summary JSON and can be edited under each player's recorded reading
 Older records without these arrays remain compatible. Raw reviewed OCR text is
 retained in summary JSON; originals and audit history remain in Supabase.
 
-The PNG uses a fixed 1080px layout exported at 2× resolution. Larger typography
-and vertically stacked tables favour readability over landscape. All season teams
+The PNG uses a fixed 1600px layout exported at 2× resolution. Larger typography
+and side-by-side League and Cup tables favour readability over landscape. All season teams
 appear in both tables; only five players appear per award. Joint positions use
 competition ranks (1,1,3), and equal values are ordered by name then ID. A tie at
 the fifth row does not expand the image: all tied players remain in dashboard lists.
@@ -215,3 +215,5 @@ result. No historical name corrections or estimated missing finishes are applied
 
 The Weekly Overview image-content selector also offers Tables only and Player
 leaders, for an optional two-image Facebook post at the same high resolution.
+
+Player names can be corrected in More → Teams & players → Edit name. Updates preserve the player ID and existing statistics. Fixtures defaults to both League and Cup for the selected season. The weekly League table includes all four category totals before total points.

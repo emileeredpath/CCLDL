@@ -41,6 +41,10 @@ test("Summary entry requires all categories, checks achievements and calculates 
   await page.getByLabel("Highest score", { exact: true }).fill("181");
   await expect(review).toBeDisabled();
   await page.getByLabel("Highest score", { exact: true }).fill("140");
+  await page.getByLabel("Double 1s", { exact: true }).fill("3");
+  await page.getByLabel("Double 1s", { exact: true }).fill("");
+  await expect(page.getByLabel("Double 1s", { exact: true })).toHaveValue("");
+  await expect(review).toBeEnabled();
   await page.getByLabel("Double 1s", { exact: true }).fill("2");
   await review.click();
   await expect(

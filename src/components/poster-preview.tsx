@@ -14,7 +14,7 @@ export default function PosterPreview({
   children: ReactNode;
 }) {
   const container = useRef<HTMLDivElement>(null);
-  const width = 1080;
+  const width = 1600;
   const [size, setSize] = useState({ scale: 1, height: 900 });
   useEffect(() => {
     const measure = () => {

@@ -1274,3 +1274,14 @@ td {
   font-weight: 700;
   color: var(--pink);
 }
+
+/* Side-by-side standings with room for every League category. */
+.poster-main-tables { grid-template-columns: 1.3fr 1fr; align-items: start; }
+.poster-main-tables .poster-league table { font-size: 27px; }
+.poster-main-tables .poster-league th { font-size: 22px; padding: 14px 6px; }
+.poster-main-tables .poster-league td { padding: 17px 6px; }
+.poster-main-tables .poster-league td:first-child { width: 30%; }
+.poster-main-tables .poster-league td:last-child { font-size: 30px; }
+.roster-player { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; }
+.roster-player form { width:100%; }
+.roster-player .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }

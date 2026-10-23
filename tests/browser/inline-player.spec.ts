@@ -149,6 +149,14 @@ test("Players and match results survive draft, approval and reload; pending achi
       return json("result");
     }
     if (path === "/rest/v1/players") {
+      if (req.method() === "PATCH") {
+        const player = players.find(
+          (p) => p.id === url.searchParams.get("id")?.replace("eq.", ""),
+        );
+        if (!player) return json({ message: "missing" }, 404);
+        player.name = req.postDataJSON().name;
+        return json({ id: player.id });
+      }
       if (req.method() === "POST") {
         const body = req.postDataJSON();
         if (failNext) {
@@ -257,7 +265,7 @@ test("Players and match results survive draft, approval and reload; pending achi
     "Draft saved to the league database",
   );
   await nav.getByRole("button", { name: "Fixtures", exact: true }).click();
-  await page.getByRole("button", { name: /Home Team vs Away Team/ }).click();
+  await page.getByRole("button", { name: /Home Team vs Away Team League/ }).click();
   await expect(
     page.getByRole("heading", { name: "Match summary", exact: true }),
   ).toBeVisible();
@@ -348,7 +356,7 @@ test("Players and match results survive draft, approval and reload; pending achi
   });
   await page.reload();
   await nav.getByRole("button", { name: "Fixtures", exact: true }).click();
-  await page.getByRole("button", { name: /Home Team vs Away Team/ }).click();
+  await page.getByRole("button", { name: /Home Team vs Away Team League/ }).click();
   await expect(
     page.getByText("Saved & approved", { exact: true }),
   ).toBeVisible();
@@ -369,6 +377,34 @@ test("Players and match results survive draft, approval and reload; pending achi
   await expect(
     page.getByRole("list", { name: "Away Team roster" }),
   ).toContainText("New Player");
+  await page
+    .getByRole("button", { name: "Edit New Player", exact: true })
+    .click();
+  await page.getByLabel("Correct player name").fill("Corrected Player");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Player name updated. Their results and statistics stay linked.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(players.find((p) => p.name === "Corrected Player")?.id).toBe(
+    (approvedPayload as any).p_summary.achievements[0].player_id,
+  );
+  // Restore name for the following OCR recognition scenario using the same edit flow.
+  await page.getByLabel("Find a team or player").fill("Corrected Player");
+  await page
+    .getByRole("button", { name: "Edit Corrected Player", exact: true })
+    .click();
+  await page.getByLabel("Correct player name").fill("New Player");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(page.getByLabel("Correct player name")).toHaveCount(0);
+  await nav.getByRole("button", { name: "Fixtures", exact: true }).click();
+  await expect(page.getByLabel("Fixture competition")).toHaveValue("all");
+  await expect(page.locator(".fixture-link")).toHaveCount(2);
+  await page.getByLabel("Fixture competition").selectOption("cup");
+  await expect(page.locator(".fixture-link")).toHaveCount(1);
+  await expect(page.locator(".fixture-link")).toContainText("Cup");
   // A transcribed draft with an unidentified achievement stays incomplete until resolved.
   savedResult = {
     ...(savedResult ?? {}),
@@ -389,7 +425,7 @@ test("Players and match results survive draft, approval and reload; pending achi
   };
   await page.reload();
   await nav.getByRole("button", { name: "Fixtures", exact: true }).click();
-  await page.getByRole("button", { name: /Home Team vs Away Team/ }).click();
+  await page.getByRole("button", { name: /Home Team vs Away Team League/ }).click();
   await expect(page.getByText(/Needs checking: Unconfirmed/)).toBeVisible();
   await page
     .getByRole("button", { name: "Finish & approve result", exact: true })
@@ -437,13 +473,11 @@ test("Players and match results survive draft, approval and reload; pending achi
     x.fillText("Singles 7 - 5", 30, 200);
     return c.toDataURL().split(",")[1];
   });
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "cup.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(cupImage, "base64"),
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "cup.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(cupImage, "base64"),
+  });
   await page
     .getByText("Read handwriting (free, experimental)", { exact: true })
     .click();
