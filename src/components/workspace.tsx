@@ -1086,6 +1086,16 @@ export default function Workspace() {
                 season={season}
               />
             </div>
+            <div className="card">
+              <h2>Cup table</h2>
+              <Table
+                teamNames={seasonTeamNames}
+                results={results}
+                competition="cup"
+                cutoff={week}
+                season={season}
+              />
+            </div>
             <div className="grid">
               <div>
                 <div className="card">
@@ -1116,16 +1126,6 @@ export default function Workspace() {
                       Your first approved result will appear here.
                     </div>
                   )}
-                </div>
-                <div className="card">
-                  <h2>Cup table</h2>
-                  <Table
-                    teamNames={seasonTeamNames}
-                    results={results}
-                    competition="cup"
-                    cutoff={week}
-                    season={season}
-                  />
                 </div>
               </div>
               <div>

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  other: { "ccldl-release": "20261023-fixtures-player-edit" },
+  other: { "ccldl-release": "20261023-home-cup" },
   title: "CCLDL · Chelmsford City Ladies Darts League",
   description:
     "Private committee workspace for Chelmsford City Ladies Darts League",
