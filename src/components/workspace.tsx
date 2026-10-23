@@ -278,6 +278,7 @@ export default function Workspace() {
 
     { name: "Results", icon: ImageIcon },
     { name: "Weekly Overview", icon: Download },
+    { name: "Teams & players", icon: Users },
   ];
   const seasonTeamNames = [
     ...new Set(
