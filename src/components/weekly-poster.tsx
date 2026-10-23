@@ -140,11 +140,11 @@ export default function WeeklyPoster({
                 <small>{trophy} · Top five players</small>
               </h2>
               <table>
-                <thead><tr>{key !== "d1" && <th>Pos</th>}<th>Player</th><th>Team</th><th>{key === "score" ? "Score" : key === "checkout" ? "Checkout" : "Total"}</th></tr></thead>
+                <thead><tr>{key === "checkout" && <th>Pos</th>}<th>Player</th><th>Team</th><th>{key === "score" ? "Score" : key === "checkout" ? "Checkout" : "Total"}</th></tr></thead>
                 <tbody>
                   {rankedStats(stats, key, 5).map((p) => (
                     <tr key={p.id}>
-                      {key !== "d1" && <td>
+                      {key === "checkout" && <td>
                         {p.joint ? "=" : ""}
                         {p.rank}
                       </td>}
