@@ -1285,3 +1285,34 @@ td {
 .roster-player { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; }
 .roster-player form { width:100%; }
 .roster-player .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+
+/* Weekly standings: two team tables above three player panels. */
+.weekly-poster { padding:12px; border:2px solid #f4aac6; color:#071a36; background:#fffafd; }
+.poster-header { display:grid; grid-template-columns:90px minmax(0,1fr) 90px; gap:16px; align-items:center; padding:8px 0 18px; background:transparent; border:0; }
+.poster-emblem { width:88px; height:88px; color:#db1265; stroke-width:2.5; }
+.poster-header h1 { font-family:Arial,sans-serif; font-style:normal; font-size:42px; font-weight:900; letter-spacing:-1px; }
+.poster-header p { display:inline-block; background:#df1267; color:white; border-radius:12px; padding:9px 35px; margin:8px 0; font-size:32px; }
+.poster-header small { display:block; font-size:17px; }
+.poster-main-tables { gap:12px; align-items:stretch; grid-template-columns:3fr 2fr; }
+.poster-main-tables .poster-league,.poster-block { border:1px solid #e73279; border-radius:8px; overflow:hidden; background:white; }
+.poster-main-tables .poster-league-title { background:#df1267; color:white; padding:12px 16px; min-height:65px; display:flex; align-items:center; gap:12px; }
+.poster-league-title span { font-size:32px; font-weight:900; }
+.poster-main-tables .poster-league-title h2 { color:white; font-size:17px; margin:0; }
+.poster-main-tables table { width:100%; }
+.poster-main-tables .poster-league table { font-size:23px; }
+.poster-main-tables .poster-league th { padding:12px 7px; font-size:19px; background:#fbd8e7; color:#7e103d; }
+.poster-main-tables .poster-league td { padding:11px 7px; font-weight:500; border:1px solid #f6d5e2; }
+.poster-main-tables .poster-league td:first-child { font-weight:700; width:29%; }
+.poster-main-tables .poster-league td:last-child { font-size:27px; font-weight:800; color:#df1267; }
+.weekly-poster tbody tr:nth-child(even) { background:#fce8f0; }
+.weekly-poster tbody tr:nth-child(odd) { background:#fff; }
+.poster-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:12px; }
+.poster-grid > .poster-block:last-child { grid-column:auto; }
+.poster-block h2 { min-height:80px; background:#df1267; color:white; font-size:29px; font-weight:800; text-transform:uppercase; text-align:left; padding:10px 16px; }
+.poster-block h2 small { font-size:14px; font-weight:400; text-transform:none; }
+.poster-block table { font-size:23px; table-layout:auto; }
+.poster-block th { background:#fbd8e7; color:#071a36; text-transform:uppercase; font-size:16px; padding:12px 7px; text-align:left; white-space:normal; }
+.poster-block td { padding:13px 7px; border:1px solid #f6d5e2; overflow-wrap:anywhere; }
+.poster-block td:last-child { width:auto; font-size:27px; text-align:center; }
+.poster-block .poster-player-team { font-size:20px; font-weight:400; }
+.weekly-poster footer { font-size:16px; line-height:1.4; padding:12px 6px 0; }

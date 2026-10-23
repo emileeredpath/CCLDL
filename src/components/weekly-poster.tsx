@@ -1,3 +1,4 @@
+import { Target } from "lucide-react";
 import { categoryStandings } from "@/lib/result-summary";
 import { standings, type Result } from "@/lib/standings";
 import { rankedStats, type PlayerStat } from "@/lib/player-statistics";
@@ -35,13 +36,13 @@ export default function WeeklyPoster({
   return (
     <>
       <header className="poster-header">
-        <h1>CHELMSFORD LADIES DARTS LEAGUE</h1>
-        <p>{season} · Weekly standings</p>
+        <Target className="poster-emblem" aria-hidden="true" /><div><h1>CHELMSFORD CITY LADIES DARTS LEAGUE</h1>
+        <p>{season} WEEKLY STANDINGS</p>
         <small>
           Through {new Date(week + "T12:00:00").toLocaleDateString("en-GB")} ·
           League & Cup combined player statistics
           {demo ? " · FICTIONAL DEMONSTRATION" : ""}
-        </small>
+        </small></div><Target className="poster-emblem" aria-hidden="true" />
       </header>
       {part !== "players" && (
         <div className="poster-main-tables">
@@ -133,12 +134,13 @@ export default function WeeklyPoster({
               ["d1", "Most Double 1s", "The Pitt Stop Madhouse Trophy"],
             ] as const
           ).map(([key, title, trophy]) => (
-            <section className="poster-block" key={key}>
+            <section className={`poster-block poster-stat-${key}`} key={key}>
               <h2>
                 {title}
                 <small>{trophy} · Top five players</small>
               </h2>
               <table>
+                <thead><tr>{key !== "d1" && <th>Pos</th>}<th>Player</th><th>Team</th><th>{key === "score" ? "Score" : key === "checkout" ? "Checkout" : "Total"}</th></tr></thead>
                 <tbody>
                   {rankedStats(stats, key, 5).map((p) => (
                     <tr key={p.id}>
@@ -148,8 +150,8 @@ export default function WeeklyPoster({
                       </td>}
                       <td>
                         {p.name}
-                        <small>{p.team}</small>
                       </td>
+                      <td className="poster-player-team">{p.team || "—"}</td>
                       <td>{p[key]}</td>
                     </tr>
                   ))}

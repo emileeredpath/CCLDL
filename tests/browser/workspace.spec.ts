@@ -83,7 +83,8 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
   await d.saveAs("test-results/weekly.png");
   const png = fs.readFileSync("test-results/weekly.png");
   expect(png.readUInt32BE(16)).toBe(3200);
-  expect(png.readUInt32BE(20)).toBeGreaterThan(2000);
+  expect(png.readUInt32BE(20)).toBeGreaterThan(1000);
+  expect(png.readUInt32BE(20)).toBeLessThan(png.readUInt32BE(16));
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
