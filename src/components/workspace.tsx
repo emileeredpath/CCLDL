@@ -907,8 +907,7 @@ export default function Workspace() {
           <div className="result-row" key={s.id}>
             <span>
               <strong>
-                {s.joint ? "=" : ""}
-                {s.rank}. {s.name}
+                {key !== "d1" && `${s.joint ? "=" : ""}${s.rank}. `}{s.name}
               </strong>
               {s.team && <small className="player-team">{s.team}</small>}
             </span>

@@ -142,10 +142,10 @@ export default function WeeklyPoster({
                 <tbody>
                   {rankedStats(stats, key, 5).map((p) => (
                     <tr key={p.id}>
-                      <td>
+                      {key !== "d1" && <td>
                         {p.joint ? "=" : ""}
                         {p.rank}
-                      </td>
+                      </td>}
                       <td>
                         {p.name}
                         <small>{p.team}</small>
