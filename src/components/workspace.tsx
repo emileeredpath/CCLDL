@@ -844,7 +844,7 @@ export default function Workspace() {
         <p className="muted">Chelmsford City Ladies Darts League</p>
         <div className="card">
           <h2>Committee sign in</h2>
-          <p className="muted">Sign in with the shared committee account.</p>
+          <p className="muted">Sign in with your committee account.</p>
           {client ? (
             <form onSubmit={login}>
               <label>
@@ -872,6 +872,7 @@ export default function Workspace() {
                 {busy ? "Signing in…" : "Secure sign in"}
                 <ShieldCheck size={17} />
               </button>
+              <p><a href="/forgot-password">Forgot password?</a></p>
             </form>
           ) : (
             <div className="notice">

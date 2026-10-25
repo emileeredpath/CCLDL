@@ -58,7 +58,7 @@ The Gail Wander Trophy is total league games won: pairs + trebles + singles + ca
 ## Phase 2 / limitations
 
 - Test against the real Supabase project, including RLS, storage and transaction behavior; add automated backend and browser tests before live use.
-- Fixture editing/deletion UI, player transfers and season-specific rosters, invitation/password recovery flows, photo recovery tooling, richer actor-labelled audit views and accessible UI polish.
+- Fixture editing/deletion UI, player transfers and season-specific rosters, invitation flows, photo recovery tooling, richer actor-labelled audit views and accessible UI polish.
 - Confirm any additional tie-break rules; equal points currently remain tied.
 - Historical PNGs currently use corrected records as of the selected match-date cutoff. They **do not** recreate what was known or published at that time. Immutable publication snapshots and historical revision reconstruction remain to be built.
 - Native device install checks, automated backup scheduling and restore drills remain to be tested. Local OCR is review-assisted because real handwriting recognition remains unreliable.
@@ -217,3 +217,15 @@ The Weekly Overview image-content selector also offers Tables only and Player
 leaders, for an optional two-image Facebook post at the same high resolution.
 
 Player names can be corrected in More → Teams & players → Edit name. Updates preserve the player ID and existing statistics. Fixtures defaults to both League and Cup for the selected season. The weekly League table includes all four category totals before total points.
+
+## Committee password recovery
+
+The sign-in page links to `/forgot-password`. Existing users request an email, open its link in the same browser (PKCE), and set a matching password of at least eight characters at `/reset-password`. Missing/expired links are rejected; recovery also accepts Supabase's implicit recovery links. The password form does not rely on an existing signed-in session. Successful changes end the local session and return the user to sign in. No password is logged or stored by the app.
+
+Production setup in **Supabase → Authentication → URL Configuration**:
+- Site URL: `https://ccldl.up.railway.app`
+- Add redirect URL: `https://ccldl.up.railway.app/reset-password`
+- The Reset Password email template must use Supabase's `{{ .ConfirmationURL }}` link (the default).
+- Verify email delivery for both committee accounts. If Supabase's default email provider restricts recipients, configure a production SMTP provider under Authentication email settings. App tests mock email delivery; they do not prove real inbox delivery.
+
+No database migration is required. Account creation and committee membership remain administrator-controlled.
