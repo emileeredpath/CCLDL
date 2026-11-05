@@ -418,3 +418,19 @@
 .card .fields + .muted {
   margin-top: 14px;
 }
+
+/* Long team names (e.g. "Moulsham Social Club B"): smaller, evenly wrapped. */
+.si-team {
+  font-size: 30px;
+  text-wrap: balance;
+}
+.si-line {
+  gap: 18px;
+}
+.si-league-table td.team {
+  font-size: 27px;
+  padding-right: 14px;
+}
+.si-cup-table td.team {
+  padding-right: 14px;
+}
