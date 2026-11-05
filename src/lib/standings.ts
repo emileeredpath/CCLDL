@@ -93,3 +93,15 @@ export function gameTypes(competition: "league" | "cup") {
         ...Array<string>(6).fill("Singles"),
       ];
 }
+
+/**
+ * Table positions. Teams level on points share a position, shown with "="
+ * (1, =2, =2, 4). No tie-break is applied until the committee confirms one.
+ */
+export function positions<T extends { points: number }>(rows: T[]) {
+  return rows.map((r) => {
+    const rank = rows.findIndex((x) => x.points === r.points) + 1;
+    const joint = rows.filter((x) => x.points === r.points).length > 1;
+    return { ...r, rank, joint, label: `${joint ? "=" : ""}${rank}` };
+  });
+}

@@ -48,7 +48,7 @@ import ManualGameEntry from "@/components/manual-game-entry";
 import { gameComplete } from "@/lib/manual-entry";
 import { supabase } from "@/lib/supabase";
 import { demoFixtures, demoResults, demoPlayers } from "@/lib/demo";
-import { gameTypes, standings, type Result } from "@/lib/standings";
+import { gameTypes, positions, standings, type Result } from "@/lib/standings";
 const client = supabase();
 const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 type Screen =
@@ -142,7 +142,9 @@ function Table({
   cutoff: string;
   season: string;
 }) {
-  const rows = standings(results, competition, cutoff, season, teamNames);
+  const rows = positions(
+    standings(results, competition, cutoff, season, teamNames),
+  );
   const kinds = ["Pairs", "Trebles", "Singles", "Captains & vice"];
   const totals = kinds.map(
     (kind) =>
@@ -159,7 +161,9 @@ function Table({
         <table>
           <thead>
             <tr>
+              <th className="pos">Pos</th>
               <th>Team</th>
+              <th>Pts</th>
               <th>Played</th>
               {full && (
                 <>
@@ -177,15 +181,16 @@ function Table({
                   <th>Legs against</th>
                 </>
               )}
-              {!breakdown && competition === "league" && <th>Lost</th>}
+              {!breakdown && competition === "league" && <th>Games lost</th>}
               {breakdown && kinds.map((kind) => <th key={kind}>{kind}</th>)}
-              <th>Total points</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.team}>
+                <td className="pos">{r.played ? r.label : "–"}</td>
                 <td style={{ fontWeight: 600 }}>{r.team}</td>
+                <td className="pts">{r.points}</td>
                 <td>{r.played}</td>
                 {full && (
                   <>
@@ -210,9 +215,6 @@ function Table({
                   kinds.map((kind, i) => (
                     <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>
                   ))}
-                <td style={{ color: "var(--pink)", fontWeight: 700 }}>
-                  {r.points}
-                </td>
               </tr>
             ))}
           </tbody>
@@ -225,8 +227,8 @@ function Table({
       )}
       <p className="muted" style={{ fontSize: 11 }}>
         {competition === "league"
-          ? "Most points first · Equal points are tied · "
-          : "Most points first · Equal points are tied · "}{" "}
+          ? "Most points first · = means level on points · "
+          : "Most points first · = means level on points · "}{" "}
         {competition === "league"
           ? "Points = Pairs + Trebles + Singles + Captains & vice."
           : "Cup: win 2 points · draw 1 · loss 0."}
