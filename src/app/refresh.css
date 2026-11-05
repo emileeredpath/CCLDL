@@ -273,3 +273,28 @@ button:focus-visible {
   display: inline-block;
   margin-top: 14px;
 }
+
+/* Standings image: one heading font throughout, matching the crest. */
+.weekly-poster .poster-header h1,
+.weekly-poster .poster-header p,
+.weekly-poster .poster-league-title span,
+.weekly-poster .poster-league-title h2,
+.weekly-poster .poster-block h2 {
+  font-family: var(--font-display);
+  font-style: normal;
+}
+.weekly-poster .poster-header h1 {
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.weekly-poster .poster-league-title span {
+  font-weight: 800;
+}
+.weekly-poster .poster-league-title h2 {
+  font-weight: 600;
+  font-size: 19px;
+  opacity: 0.95;
+}
+.weekly-poster .poster-block h2 small {
+  font-family: Arial, Helvetica, sans-serif;
+}
