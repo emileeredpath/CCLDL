@@ -4,6 +4,7 @@ import "@fontsource/montserrat/700.css";
 import "@fontsource/montserrat/800.css";
 import "./globals.css";
 import "./refresh.css";
+import "./share-images.css";
 export const metadata: Metadata = {
   other: { "ccldl-release": "20261105-weekly-results-share" },
   title: "CCLDL · Chelmsford City Ladies Darts League",

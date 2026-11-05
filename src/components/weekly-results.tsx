@@ -1,7 +1,8 @@
 import type { WeeklyMatch } from "@/lib/weekly-results";
 import { longDate } from "@/lib/weekly-results";
+import { ImageFooter, ImageHeader } from "@/components/share-images";
 
-/** Shareable image of one round's matches. Sized 1080px wide for phones. */
+/** Image 1 of 3: one round's matches, scores and section winners. */
 export default function WeeklyResults({
   season,
   date,
@@ -18,57 +19,60 @@ export default function WeeklyResults({
   demo: boolean;
 }) {
   const pending = matches.filter((m) => m.homeWins === null).length;
+  const catchUp = label.startsWith("Catch-up") || label.includes("catch-up");
+  const notes = [
+    matches.some((m) => m.sections.length)
+      ? "Section scores are home – away. The section winner is shown in pink."
+      : "",
+    pending
+      ? `${pending === 1 ? "1 result is" : `${pending} results are`} still to be confirmed.`
+      : "",
+  ].filter(Boolean);
   return (
-    <div className="wr">
-      <header className="wr-head">
-        <img className="wr-crest" src="/ccldl-crest.png" alt="" />
-        <div>
-          <p className="wr-league">Chelmsford City Ladies Darts League</p>
-          <h1>Weekly results</h1>
-          <p className="wr-round">
-            <span>{label}</span> {longDate(date)}
-          </p>
-        </div>
-      </header>
-
-      {matches.length ? (
-        <div className="wr-matches">
-          {matches.map((m) => {
+    <div className="si">
+      <ImageHeader
+        title="This week's results"
+        sub={`${label} · ${longDate(date)}`}
+        tag="1 of 3"
+      />
+      <div className="si-body">
+        {matches.length ? (
+          matches.map((m) => {
             const done = m.homeWins !== null && m.awayWins !== null;
             const homeWon = done && m.homeWins! > m.awayWins!;
             const awayWon = done && m.awayWins! > m.homeWins!;
             const draw = done && m.homeWins === m.awayWins;
             return (
-              <section className="wr-match" key={m.fixtureId}>
-                {label.includes("catch-up") || label.startsWith("Catch-up") ? (
-                  <p className="wr-comp">
+              <section className="si-card si-match" key={m.fixtureId}>
+                {catchUp && (
+                  <p className="si-comp">
                     {m.competition === "cup" ? "Cup" : "League"}
                   </p>
-                ) : null}
-                <div className="wr-line">
-                  <span className={`wr-team ${homeWon ? "won" : ""}`}>
+                )}
+                <div className="si-line">
+                  <span className={`si-team ${homeWon ? "won" : ""}`}>
                     {m.home}
                   </span>
                   {done ? (
-                    <span className={`wr-score ${draw ? "draw" : ""}`}>
+                    <span className={`si-score ${draw ? "draw" : ""}`}>
                       {m.homeWins}
                       <i>–</i>
                       {m.awayWins}
                     </span>
                   ) : (
-                    <span className="wr-score pending">To follow</span>
+                    <span className="si-score pending">To follow</span>
                   )}
-                  <span className={`wr-team away ${awayWon ? "won" : ""}`}>
+                  <span className={`si-team away ${awayWon ? "won" : ""}`}>
                     {m.away}
                   </span>
                 </div>
-                {draw && <p className="wr-note">Match drawn</p>}
+                {draw && <p className="si-draw">Match drawn</p>}
                 {m.sections.length > 0 && (
-                  <div className="wr-sections">
+                  <div className="si-sections">
                     {m.sections.map((s) => (
-                      <div className="wr-section" key={s.name}>
-                        <span className="wr-section-name">{s.short}</span>
-                        <span className="wr-section-score">
+                      <div className="si-section" key={s.name}>
+                        <span className="name">{s.short}</span>
+                        <span className="val">
                           <b className={s.home > s.away ? "win" : ""}>
                             {s.home}
                           </b>
@@ -83,34 +87,17 @@ export default function WeeklyResults({
                 )}
               </section>
             );
-          })}
-        </div>
-      ) : (
-        <p className="wr-empty">No fixtures on this date.</p>
-      )}
-
-      {bye.length > 0 && (
-        <p className="wr-bye">
-          Bye this week: <strong>{bye.join(", ")}</strong>
-        </p>
-      )}
-
-      <footer className="wr-foot">
-        {matches.some((m) => m.sections.length) && (
-          <p>
-            Section scores are home – away. The winning side is shown in pink.
+          })
+        ) : (
+          <p className="si-empty">No fixtures on this date.</p>
+        )}
+        {bye.length > 0 && (
+          <p className="si-bye">
+            Bye this week: <strong>{bye.join(", ")}</strong>
           </p>
         )}
-        {pending > 0 && (
-          <p>
-            {pending === 1 ? "1 result is" : `${pending} results are`} still to
-            be confirmed.
-          </p>
-        )}
-        <p className="wr-brand">
-          {season} season{demo ? " · FICTIONAL DEMONSTRATION" : ""}
-        </p>
-      </footer>
+      </div>
+      <ImageFooter note={notes.join(" ")} season={season} demo={demo} />
     </div>
   );
 }

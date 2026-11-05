@@ -261,3 +261,16 @@ for category-total results the committee enters only qualifying finishes, as
 the entry form reminds them. Highest score and highest checkout still use
 League and Cup results. Existing records are not changed: totals are
 recalculated from saved results.
+
+### Weekly share images (three-image set)
+
+Weekly Overview now builds three matching images for each round, each 1080 x
+1350 (Facebook's portrait size, exported at 2x): **1. This week's results**,
+**2. League table** (with Pairs, Trebles, C&V and Singles) and **3. Cup &
+player awards**. Pick the week once; all three follow it. Each image has its
+own Share and Download buttons, and **Share all 3** sends the set in one go
+(on phones that support sharing several files; otherwise all three download).
+Styles live in `src/app/share-images.css`; the images are built by
+`src/components/weekly-results.tsx` and `src/components/share-images.tsx`.
+Positions no longer use "=": teams level on points share the same number, and
+teams yet to play sit at the bottom without a position.

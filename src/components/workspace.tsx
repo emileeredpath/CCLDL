@@ -26,9 +26,14 @@ import { normalise } from "@/lib/player-csv";
 import PlayerCsvImport from "@/components/player-csv-import";
 import MatchSummary from "@/components/match-summary";
 import PosterPreview from "@/components/poster-preview";
-import WeeklyPoster from "@/components/weekly-poster";
+import { CupAwardsImage, LeagueImage } from "@/components/share-images";
 import WeeklyResults from "@/components/weekly-results";
-import { download, renderPng, shareOrDownload } from "@/lib/share-image";
+import {
+  download,
+  renderPng,
+  shareManyOrDownload,
+  shareOrDownload,
+} from "@/lib/share-image";
 import {
   byeTeams,
   latestRound,
@@ -227,8 +232,8 @@ function Table({
       )}
       <p className="muted" style={{ fontSize: 11 }}>
         {competition === "league"
-          ? "Most points first · = means level on points · "
-          : "Most points first · = means level on points · "}{" "}
+          ? "Most points first · Teams level on points share a position · "
+          : "Most points first · Teams level on points share a position · "}{" "}
         {competition === "league"
           ? "Points = Pairs + Trebles + Singles + Captains & vice."
           : "Cup: win 2 points · draw 1 · loss 0."}
@@ -276,10 +281,9 @@ export default function Workspace() {
   const [review, setReview] = useState(false);
   const [archivePreview, setArchivePreview] = useState("");
   const [history, setHistory] = useState<string[]>([]);
-  const [posterPart, setPosterPart] = useState<
-    "results" | "all" | "tables" | "players"
-  >("results");
-  const weeklyRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const leagueRef = useRef<HTMLDivElement>(null);
+  const cupRef = useRef<HTMLDivElement>(null);
   const nav: { name: Screen; icon: typeof Home }[] = [
     { name: "Home", icon: Home },
     { name: "Fixtures", icon: CalendarDays },
@@ -944,7 +948,7 @@ export default function Workspace() {
           <div className="result-row" key={s.id}>
             <span>
               <strong>
-                {key === "checkout" && `${s.joint ? "=" : ""}${s.rank}. `}{s.name}
+                {key === "checkout" && `${s.rank}. `}{s.name}
               </strong>
               {s.team && <small className="player-team">{s.team}</small>}
             </span>
@@ -1055,7 +1059,7 @@ export default function Workspace() {
                 ))}
               </select>
             </label>
-            {["Tables", "Results", "Weekly Overview"].includes(screen) && (
+            {["Tables", "Results"].includes(screen) && (
               <label>
                 Competition
                 <select
@@ -2019,149 +2023,210 @@ export default function Workspace() {
         )}
         {screen === "Weekly Overview" && (
           <>
-            <div className="card">
-              <div className="fields">
-                <label>
-                  Image
-                  <select
-                    value={posterPart}
-                    onChange={(e) =>
-                      setPosterPart(e.target.value as typeof posterPart)
-                    }
-                  >
-                    <option value="results">This week&apos;s results</option>
-                    <option value="all">Tables and player awards</option>
-                    <option value="tables">Tables only</option>
-                    <option value="players">Player awards only</option>
-                  </select>
-                </label>
-                {posterPart === "results" ? (
-                  <label>
-                    Week
-                    <select
-                      value={shownRound?.date ?? ""}
-                      onChange={(e) => setWeek(e.target.value)}
-                      disabled={!rounds.length}
-                    >
-                      {!rounds.length && <option value="">No fixtures yet</option>}
-                      {[...rounds].reverse().map((r) => (
-                        <option key={r.date} value={r.date}>
-                          {r.label} · {dateLabel(r.date)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : (
-                  <label>
-                    Include results through
-                    <input
-                      type="date"
-                      value={week}
-                      onChange={(e) => setWeek(e.target.value)}
+            {(() => {
+              const tag = shownRound?.date ?? week;
+              const suffix = demo ? "-DEMO" : "";
+              const roundText = shownRound
+                ? shownRound.number
+                  ? `after ${shownRound.label} · ${dateLabel(shownRound.date)}`
+                  : `up to ${dateLabel(shownRound.date)}`
+                : `up to ${dateLabel(week)}`;
+              const images = [
+                {
+                  key: "results",
+                  title: "1. This week's results",
+                  ref: resultsRef,
+                  file: `CCLDL-1-results-${tag}${suffix}.png`,
+                  ready: Boolean(shownRound),
+                },
+                {
+                  key: "league",
+                  title: "2. League table",
+                  ref: leagueRef,
+                  file: `CCLDL-2-league-${tag}${suffix}.png`,
+                  ready: true,
+                },
+                {
+                  key: "cup",
+                  title: "3. Cup & player awards",
+                  ref: cupRef,
+                  file: `CCLDL-3-cup-awards-${tag}${suffix}.png`,
+                  ready: statsReady,
+                },
+              ];
+              const caption = `Chelmsford City Ladies Darts League · ${shownRound?.label ?? season}`;
+              const note = (outcome: string) => {
+                if (outcome === "downloaded")
+                  setMessage(
+                    "Sharing isn't available on this device, so the images have been downloaded. Attach them to your WhatsApp or Facebook post.",
+                  );
+              };
+              const run = async (job: () => Promise<void>) => {
+                setBusy(true);
+                try {
+                  await job();
+                } catch {
+                  setMessage("The image couldn't be created. Please try again.");
+                } finally {
+                  setBusy(false);
+                }
+              };
+              const allReady = images.every((i) => i.ready) && !busy;
+              const preview = (key: string) =>
+                key === "results" ? (
+                  shownRound ? (
+                    <WeeklyResults
+                      season={season}
+                      date={shownRound.date}
+                      label={shownRound.label}
+                      matches={roundMatches}
+                      bye={roundBye}
+                      demo={demo}
                     />
-                  </label>
-                )}
-                <div className="share-actions">
-                  {(() => {
-                    const resultsImage = posterPart === "results";
-                    const name = resultsImage
-                      ? `CCLDL-results-${shownRound?.date ?? week}${demo ? "-DEMO" : ""}.png`
-                      : `CCLDL-standings-${week}-${posterPart}${demo ? "-DEMO" : ""}.png`;
-                    const caption = resultsImage
-                      ? `Chelmsford City Ladies Darts League · ${shownRound?.label ?? "Results"} results`
-                      : `Chelmsford City Ladies Darts League · ${season} standings`;
-                    const disabled =
-                      busy ||
-                      !week ||
-                      (resultsImage ? !shownRound : !statsReady);
-                    const run = async (share: boolean) => {
-                      if (!weeklyRef.current) return;
-                      setBusy(true);
-                      try {
-                        if (share) {
-                          const outcome = await shareOrDownload(
-                            weeklyRef.current,
-                            name,
-                            caption,
-                          );
-                          if (outcome === "downloaded")
-                            setMessage(
-                              "Sharing isn't available on this device, so the image has been downloaded. Attach it to your WhatsApp or Facebook post.",
-                            );
-                        } else {
-                          const { url } = await renderPng(weeklyRef.current, name);
-                          download(url, name);
-                        }
-                      } catch {
-                        setMessage("The image couldn't be created. Please try again.");
-                      } finally {
-                        setBusy(false);
-                      }
-                    };
-                    return (
-                      <>
-                        <button
-                          className="primary"
-                          onClick={() => run(true)}
-                          disabled={disabled}
-                        >
-                          <Share2 size={16} /> Share
-                        </button>
-                        <button
-                          className="secondary"
-                          onClick={() => run(false)}
-                          disabled={disabled}
-                        >
-                          <Download size={16} /> Download
-                        </button>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-              <p className="muted">
-                On a phone, Share opens your share menu so you can send the
-                image straight to WhatsApp or Facebook. Only approved results
-                appear. Earlier weeks use the latest corrected results.
-              </p>
-            </div>
-            {posterPart === "results" ? (
-              <PosterPreview
-                key="results"
-                posterRef={weeklyRef}
-                width={1080}
-                className="results-poster"
-              >
-                {shownRound ? (
-                  <WeeklyResults
+                  ) : (
+                    <p className="si-empty">
+                      No fixtures have been played yet this season.
+                    </p>
+                  )
+                ) : key === "league" ? (
+                  <LeagueImage
+                    results={results}
                     season={season}
-                    date={shownRound.date}
-                    label={shownRound.label}
-                    matches={roundMatches}
-                    bye={roundBye}
+                    week={week}
+                    teamNames={seasonTeamNames}
+                    roundText={roundText}
                     demo={demo}
                   />
                 ) : (
-                  <p className="wr-empty">
-                    No fixtures have been played yet this season.
-                  </p>
-                )}
-              </PosterPreview>
-            ) : (
-              <PosterPreview key="standings" posterRef={weeklyRef}>
-                <WeeklyPoster
-                  part={posterPart}
-                  teamNames={seasonTeamNames}
-                  results={results}
-                  stats={stats}
-                  season={season}
-                  week={week}
-                  competition={competition}
-                  incomplete={incomplete.length}
-                  demo={demo}
-                />
-              </PosterPreview>
-            )}
+                  <CupAwardsImage
+                    results={results}
+                    stats={stats}
+                    season={season}
+                    week={week}
+                    teamNames={seasonTeamNames}
+                    roundText={roundText}
+                    demo={demo}
+                  />
+                );
+              return (
+                <>
+                  <div className="card">
+                    <div className="fields">
+                      <label>
+                        Week
+                        <select
+                          value={shownRound?.date ?? ""}
+                          onChange={(e) => setWeek(e.target.value)}
+                          disabled={!rounds.length}
+                        >
+                          {!rounds.length && (
+                            <option value="">No fixtures yet</option>
+                          )}
+                          {[...rounds].reverse().map((r) => (
+                            <option key={r.date} value={r.date}>
+                              {r.label} · {dateLabel(r.date)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="share-actions">
+                        <button
+                          className="primary"
+                          disabled={!allReady}
+                          onClick={() =>
+                            run(async () =>
+                              note(
+                                await shareManyOrDownload(
+                                  images.map((i) => ({
+                                    node: i.ref.current!,
+                                    filename: i.file,
+                                  })),
+                                  caption,
+                                ),
+                              ),
+                            )
+                          }
+                        >
+                          <Share2 size={16} /> Share all 3
+                        </button>
+                        <button
+                          className="secondary"
+                          disabled={!allReady}
+                          onClick={() =>
+                            run(async () => {
+                              for (const i of images) {
+                                const { url } = await renderPng(
+                                  i.ref.current!,
+                                  i.file,
+                                );
+                                download(url, i.file);
+                              }
+                            })
+                          }
+                        >
+                          <Download size={16} /> Download all
+                        </button>
+                      </div>
+                    </div>
+                    <p className="muted">
+                      On a phone, Share opens your share menu so you can send
+                      the images straight to WhatsApp or Facebook. Only
+                      approved results appear. Earlier weeks use the latest
+                      corrected results.
+                    </p>
+                  </div>
+                  <div className="si-set">
+                    {images.map((i) => (
+                      <section className="card si-set-item" key={i.key}>
+                        <h2>{i.title}</h2>
+                        <PosterPreview
+                          key={i.key}
+                          posterRef={i.ref}
+                          width={1080}
+                          className="si-frame"
+                        >
+                          {preview(i.key)}
+                        </PosterPreview>
+                        <div className="actions">
+                          <button
+                            className="primary"
+                            disabled={!i.ready || busy}
+                            onClick={() =>
+                              run(async () =>
+                                note(
+                                  await shareOrDownload(
+                                    i.ref.current!,
+                                    i.file,
+                                    caption,
+                                  ),
+                                ),
+                              )
+                            }
+                          >
+                            <Share2 size={16} /> Share
+                          </button>
+                          <button
+                            className="secondary"
+                            disabled={!i.ready || busy}
+                            onClick={() =>
+                              run(async () => {
+                                const { url } = await renderPng(
+                                  i.ref.current!,
+                                  i.file,
+                                );
+                                download(url, i.file);
+                              })
+                            }
+                          >
+                            <Download size={16} /> Download
+                          </button>
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
           </>
         )}
         {screen === "More" && (

@@ -41,3 +41,28 @@ export async function shareOrDownload(
   download(url, filename);
   return "downloaded";
 }
+
+/**
+ * Shares several images in one go (WhatsApp and Facebook both accept a set
+ * of photos). Falls back to downloading each one.
+ */
+export async function shareManyOrDownload(
+  items: { node: HTMLElement; filename: string }[],
+  text: string,
+): Promise<ShareOutcome> {
+  const rendered = [];
+  for (const { node, filename } of items)
+    rendered.push(await renderPng(node, filename));
+  const data: ShareData = { files: rendered.map((r) => r.file), text };
+  if (typeof navigator !== "undefined" && navigator.canShare?.(data)) {
+    try {
+      await navigator.share(data);
+      return "shared";
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError")
+        return "cancelled";
+    }
+  }
+  rendered.forEach((r, i) => download(r.url, items[i].filename));
+  return "downloaded";
+}

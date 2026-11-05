@@ -67,48 +67,48 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
     .getByRole("button", { name: "Weekly Overview", exact: true })
     .last()
     .click();
-  // The weekly results image is the default: 1080px wide, exported at 2x.
+  // Three share images, each 1080 x 1350 or taller, exported at 2x.
   await expect(
-    page.getByRole("heading", { name: "Weekly results" }),
+    page.getByRole("heading", { name: "This week's results", exact: true }),
   ).toBeVisible();
-  const resultsDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download", exact: true }).click();
-  const r = await resultsDownload;
-  await r.saveAs("test-results/weekly-results.png");
-  const resultsPng = fs.readFileSync("test-results/weekly-results.png");
-  expect(resultsPng.readUInt32BE(16)).toBe(2160);
-  expect(r.suggestedFilename()).toMatch(/CCLDL-results-.*-DEMO.png/);
-  // Browsers without file sharing fall back to a download and explain why.
-  const shareFallback = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Share", exact: true }).click();
-  await shareFallback;
+  await expect(
+    page.getByRole("heading", { name: "League table" }).last(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Cup & player awards", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Most Double 1s", exact: true }).last(),
+  ).toBeVisible();
+  const items = page.locator(".si-set-item");
+  await expect(items).toHaveCount(3);
+  for (const [i, name] of ["results", "league", "cup-awards"].entries()) {
+    const dl = page.waitForEvent("download");
+    await items
+      .nth(i)
+      .getByRole("button", { name: "Download", exact: true })
+      .click();
+    const d = await dl;
+    expect(d.suggestedFilename()).toMatch(
+      new RegExp(`CCLDL-${i + 1}-${name}-.*-DEMO.png`),
+    );
+    await d.saveAs(`test-results/weekly-${i + 1}.png`);
+    const png = fs.readFileSync(`test-results/weekly-${i + 1}.png`);
+    expect(png.readUInt32BE(16)).toBe(2160);
+    expect(png.readUInt32BE(20)).toBeGreaterThanOrEqual(2700);
+    expect(await d.failure()).toBeNull();
+  }
+  // Browsers without file sharing fall back to downloads and explain why.
+  let count = 0;
+  page.on("download", () => count++);
+  await page.getByRole("button", { name: "Share all 3" }).click();
   await expect(page.getByText(/Sharing isn't available/)).toBeVisible();
-  await page.getByLabel("Image").selectOption("all");
-  await expect(
-    page.getByRole("heading", {
-      name: "The Gail Wander Trophy",
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", {
-      name: "Most Double 1s The Pitt Stop Madhouse Trophy · Top five players",
-    }),
-  ).toBeVisible();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download", exact: true }).click();
-  const d = await download;
-  await d.saveAs("test-results/weekly.png");
-  const png = fs.readFileSync("test-results/weekly.png");
-  expect(png.readUInt32BE(16)).toBe(3200);
-  expect(png.readUInt32BE(20)).toBeGreaterThan(1000);
-  expect(png.readUInt32BE(20)).toBeLessThan(png.readUInt32BE(16));
+  await expect.poll(() => count).toBe(3);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  expect(d.suggestedFilename()).toMatch(/CCLDL-.*-DEMO.png/);
-  expect(await d.failure()).toBeNull();
   expect(errors).toEqual([]);
 });
 test("Desktop dashboard and PWA assets", async ({ page, request }) => {
