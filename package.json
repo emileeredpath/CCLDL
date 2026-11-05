@@ -13,6 +13,7 @@
     "predev": "node scripts/prepare-ocr.mjs"
   },
   "dependencies": {
+    "@fontsource/montserrat": "^5.2.6",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.57.0",
     "@tesseract.js-data/eng": "^1.0.0",

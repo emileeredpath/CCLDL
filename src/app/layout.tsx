@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource/montserrat/600.css";
+import "@fontsource/montserrat/700.css";
+import "@fontsource/montserrat/800.css";
 import "./globals.css";
+import "./refresh.css";
 export const metadata: Metadata = {
   other: { "ccldl-release": "20261105-weekly-results-share" },
   title: "CCLDL · Chelmsford City Ladies Darts League",
@@ -12,7 +16,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#be426d",
+  themeColor: "#7e103d",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
