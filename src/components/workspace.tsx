@@ -10,6 +10,7 @@ import {
   Trophy,
   Image as ImageIcon,
   Download,
+  Share2,
   LogOut,
   ArrowUpRight,
   ShieldCheck,
@@ -21,12 +22,19 @@ import {
   rankedStats,
   type PlayerStat,
 } from "@/lib/player-statistics";
-import { toPng } from "html-to-image";
 import { normalise } from "@/lib/player-csv";
 import PlayerCsvImport from "@/components/player-csv-import";
 import MatchSummary from "@/components/match-summary";
 import PosterPreview from "@/components/poster-preview";
 import WeeklyPoster from "@/components/weekly-poster";
+import WeeklyResults from "@/components/weekly-results";
+import { download, renderPng, shareOrDownload } from "@/lib/share-image";
+import {
+  byeTeams,
+  latestRound,
+  weeklyMatches,
+  weeklyRounds,
+} from "@/lib/weekly-results";
 import SheetScanner from "@/components/sheet-scanner";
 import SummaryEntry from "@/components/summary-entry";
 import {
@@ -266,9 +274,9 @@ export default function Workspace() {
   const [review, setReview] = useState(false);
   const [archivePreview, setArchivePreview] = useState("");
   const [history, setHistory] = useState<string[]>([]);
-  const [posterPart, setPosterPart] = useState<"all" | "tables" | "players">(
-    "all",
-  );
+  const [posterPart, setPosterPart] = useState<
+    "results" | "all" | "tables" | "players"
+  >("results");
   const weeklyRef = useRef<HTMLDivElement>(null);
   const nav: { name: Screen; icon: typeof Home }[] = [
     { name: "Home", icon: Home },
@@ -807,6 +815,27 @@ export default function Workspace() {
     );
   }
   const scoped = results.filter((r) => r.season === season && r.approved);
+  const rounds = weeklyRounds(
+    fixtures.filter((f) => demo || f.season === season),
+    season,
+  );
+  const shownRound = latestRound(rounds, week);
+  const roundMatches = shownRound
+    ? weeklyMatches(
+        fixtures.filter((f) => demo || f.season === season),
+        results,
+        shownRound.date,
+        season,
+      )
+    : [];
+  const roundBye = shownRound
+    ? byeTeams(
+        fixtures.filter((f) => demo || f.season === season),
+        shownRound.date,
+        season,
+        seasonTeamNames,
+      )
+    : [];
   const incomplete = fixtures.filter(
     (f) =>
       (demo || f.season === season) &&
@@ -838,7 +867,7 @@ export default function Workspace() {
     return (
       <main className="login">
         <div className="brand-mark">
-          <Target size={28} />
+          <img src="/ccldl-crest.png" alt="" />
         </div>
         <h1>Welcome to CCLDL</h1>
         <p className="muted">Chelmsford City Ladies Darts League</p>
@@ -932,7 +961,7 @@ export default function Workspace() {
           }}
         >
           <div className="brand-mark">
-            <Target />
+            <img src="/ccldl-crest.png" alt="" />
           </div>
           <span className="brand">CCLDL</span>
         </div>
@@ -1985,74 +2014,146 @@ export default function Workspace() {
             <div className="card">
               <div className="fields">
                 <label>
-                  Include results through
-                  <input
-                    type="date"
-                    value={week}
-                    onChange={(e) => setWeek(e.target.value)}
-                  />
-                </label>
-                <label>
-                  Image content
+                  Image
                   <select
                     value={posterPart}
                     onChange={(e) =>
                       setPosterPart(e.target.value as typeof posterPart)
                     }
                   >
-                    <option value="all">Everything · one PNG</option>
-                    <option value="tables">Tables only · image 1 of 2</option>
-                    <option value="players">
-                      Player leaders · image 2 of 2
-                    </option>
+                    <option value="results">This week&apos;s results</option>
+                    <option value="all">Tables and player awards</option>
+                    <option value="tables">Tables only</option>
+                    <option value="players">Player awards only</option>
                   </select>
                 </label>
-                <div style={{ alignSelf: "end" }}>
-                  <button
-                    className="primary"
-                    onClick={async () => {
+                {posterPart === "results" ? (
+                  <label>
+                    Week
+                    <select
+                      value={shownRound?.date ?? ""}
+                      onChange={(e) => setWeek(e.target.value)}
+                      disabled={!rounds.length}
+                    >
+                      {!rounds.length && <option value="">No fixtures yet</option>}
+                      {[...rounds].reverse().map((r) => (
+                        <option key={r.date} value={r.date}>
+                          {r.label} · {dateLabel(r.date)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label>
+                    Include results through
+                    <input
+                      type="date"
+                      value={week}
+                      onChange={(e) => setWeek(e.target.value)}
+                    />
+                  </label>
+                )}
+                <div className="share-actions">
+                  {(() => {
+                    const resultsImage = posterPart === "results";
+                    const name = resultsImage
+                      ? `CCLDL-results-${shownRound?.date ?? week}${demo ? "-DEMO" : ""}.png`
+                      : `CCLDL-standings-${week}-${posterPart}${demo ? "-DEMO" : ""}.png`;
+                    const caption = resultsImage
+                      ? `Chelmsford City Ladies Darts League · ${shownRound?.label ?? "Results"} results`
+                      : `Chelmsford City Ladies Darts League · ${season} standings`;
+                    const disabled =
+                      busy ||
+                      !week ||
+                      (resultsImage ? !shownRound : !statsReady);
+                    const run = async (share: boolean) => {
                       if (!weeklyRef.current) return;
                       setBusy(true);
                       try {
-                        const url = await toPng(weeklyRef.current, {
-                          pixelRatio: 2,
-                          backgroundColor: "#ffffff",
-                        });
-                        const a = document.createElement("a");
-                        a.download = `CCLDL-${week}-${posterPart}${demo ? "-DEMO" : ""}.png`;
-                        a.href = url;
-                        a.click();
+                        if (share) {
+                          const outcome = await shareOrDownload(
+                            weeklyRef.current,
+                            name,
+                            caption,
+                          );
+                          if (outcome === "downloaded")
+                            setMessage(
+                              "Sharing isn't available on this device, so the image has been downloaded. Attach it to your WhatsApp or Facebook post.",
+                            );
+                        } else {
+                          const { url } = await renderPng(weeklyRef.current, name);
+                          download(url, name);
+                        }
                       } catch {
-                        setMessage("PNG generation failed. Please try again.");
+                        setMessage("The image couldn't be created. Please try again.");
                       } finally {
                         setBusy(false);
                       }
-                    }}
-                    disabled={busy || !statsReady || !week}
-                  >
-                    <Download size={16} /> Download PNG
-                  </button>
+                    };
+                    return (
+                      <>
+                        <button
+                          className="primary"
+                          onClick={() => run(true)}
+                          disabled={disabled}
+                        >
+                          <Share2 size={16} /> Share
+                        </button>
+                        <button
+                          className="secondary"
+                          onClick={() => run(false)}
+                          disabled={disabled}
+                        >
+                          <Download size={16} /> Download
+                        </button>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               <p className="muted">
-                Download the image and attach it to your Facebook group post.
-                The image keeps the same readable layout on every phone.
-                Previous dates use the latest corrected results.
+                On a phone, Share opens your share menu so you can send the
+                image straight to WhatsApp or Facebook. Only approved results
+                appear. Earlier weeks use the latest corrected results.
               </p>
             </div>
-            <PosterPreview posterRef={weeklyRef}>
-              <WeeklyPoster
-                part={posterPart}
-                teamNames={seasonTeamNames}
-                results={results}
-                stats={stats}
-                season={season}
-                week={week}
-                competition={competition}
-                incomplete={incomplete.length}
-                demo={demo}
-              />
-            </PosterPreview>
+            {posterPart === "results" ? (
+              <PosterPreview
+                key="results"
+                posterRef={weeklyRef}
+                width={1080}
+                className="results-poster"
+              >
+                {shownRound ? (
+                  <WeeklyResults
+                    season={season}
+                    date={shownRound.date}
+                    label={shownRound.label}
+                    matches={roundMatches}
+                    bye={roundBye}
+                    demo={demo}
+                  />
+                ) : (
+                  <p className="wr-empty">
+                    No fixtures have been played yet this season.
+                  </p>
+                )}
+              </PosterPreview>
+            ) : (
+              <PosterPreview key="standings" posterRef={weeklyRef}>
+                <WeeklyPoster
+                  part={posterPart}
+                  teamNames={seasonTeamNames}
+                  results={results}
+                  stats={stats}
+                  season={season}
+                  week={week}
+                  competition={competition}
+                  incomplete={incomplete.length}
+                  demo={demo}
+                />
+              </PosterPreview>
+            )}
           </>
         )}
         {screen === "More" && (

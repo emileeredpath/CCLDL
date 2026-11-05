@@ -9,12 +9,15 @@ import {
 export default function PosterPreview({
   posterRef,
   children,
+  width = 1600,
+  className = "weekly-poster",
 }: {
   posterRef: RefObject<HTMLDivElement | null>;
   children: ReactNode;
+  width?: number;
+  className?: string;
 }) {
   const container = useRef<HTMLDivElement>(null);
-  const width = 1600;
   const [size, setSize] = useState({ scale: 1, height: 900 });
   useEffect(() => {
     const measure = () => {
@@ -42,7 +45,7 @@ export default function PosterPreview({
           width,
         }}
       >
-        <div ref={posterRef} className="weekly-poster" style={{ width }}>
+        <div ref={posterRef} className={className} style={{ width }}>
           {children}
         </div>
       </div>

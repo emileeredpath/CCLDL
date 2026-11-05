@@ -1,4 +1,3 @@
-import { Target } from "lucide-react";
 import { categoryStandings } from "@/lib/result-summary";
 import { standings, type Result } from "@/lib/standings";
 import { rankedStats, type PlayerStat } from "@/lib/player-statistics";
@@ -36,13 +35,13 @@ export default function WeeklyPoster({
   return (
     <>
       <header className="poster-header">
-        <Target className="poster-emblem" aria-hidden="true" /><div><h1>CHELMSFORD CITY LADIES DARTS LEAGUE</h1>
+        <img className="poster-emblem-img" src="/ccldl-crest.png" alt="" /><div><h1>CHELMSFORD CITY LADIES DARTS LEAGUE</h1>
         <p>{season} WEEKLY STANDINGS</p>
         <small>
           Through {new Date(week + "T12:00:00").toLocaleDateString("en-GB")} ·
           League & Cup combined player statistics
           {demo ? " · FICTIONAL DEMONSTRATION" : ""}
-        </small></div><Target className="poster-emblem" aria-hidden="true" />
+        </small></div><img className="poster-emblem-img" src="/ccldl-crest.png" alt="" />
       </header>
       {part !== "players" && (
         <div className="poster-main-tables">
@@ -169,7 +168,7 @@ export default function WeeklyPoster({
           ? `INCOMPLETE: ${incomplete} scheduled matches still need approved results.`
           : "All entered fixtures through this date have approved results."}
         <br />P played · W won · D drawn · L lost · LF/LA legs for/against · Pts
-        points. C&V captains & vice. — category breakdown not recorded.
+        points. C&V captains & vice.
         <br />
         Equal points remain tied. Joint player positions use =. Five players per
         list; equal values ordered by name. Full statistics remain in the

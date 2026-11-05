@@ -67,6 +67,23 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
     .getByRole("button", { name: "Weekly Overview", exact: true })
     .last()
     .click();
+  // The weekly results image is the default: 1080px wide, exported at 2x.
+  await expect(
+    page.getByRole("heading", { name: "Weekly results" }),
+  ).toBeVisible();
+  const resultsDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download", exact: true }).click();
+  const r = await resultsDownload;
+  await r.saveAs("test-results/weekly-results.png");
+  const resultsPng = fs.readFileSync("test-results/weekly-results.png");
+  expect(resultsPng.readUInt32BE(16)).toBe(2160);
+  expect(r.suggestedFilename()).toMatch(/CCLDL-results-.*-DEMO.png/);
+  // Browsers without file sharing fall back to a download and explain why.
+  const shareFallback = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await shareFallback;
+  await expect(page.getByText(/Sharing isn't available/)).toBeVisible();
+  await page.getByLabel("Image").selectOption("all");
   await expect(
     page.getByRole("heading", {
       name: "The Gail Wander Trophy",
@@ -78,7 +95,7 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
     }),
   ).toBeVisible();
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download PNG" }).click();
+  await page.getByRole("button", { name: "Download", exact: true }).click();
   const d = await download;
   await d.saveAs("test-results/weekly.png");
   const png = fs.readFileSync("test-results/weekly.png");

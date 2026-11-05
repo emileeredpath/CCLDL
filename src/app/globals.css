@@ -1316,3 +1316,44 @@ td {
 .poster-block td:last-child { width:auto; font-size:27px; text-align:center; }
 .poster-block .poster-player-team { font-size:20px; font-weight:400; }
 .weekly-poster footer { font-size:16px; line-height:1.4; padding:12px 6px 0; }
+
+/* Weekly results image: one round's matches, built for phone screens (1080px wide). */
+.results-poster { background: #fffafd; color: #1d1320; font-family: Arial, Helvetica, sans-serif; padding: 48px 48px 40px; border: 3px solid #f4aac6; }
+.wr-head { display: flex; align-items: center; gap: 32px; padding-bottom: 32px; border-bottom: 3px solid #f6d5e2; }
+.wr-crest { width: 168px; height: 168px; flex: 0 0 auto; }
+.wr-league { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #7e103d; }
+.wr-head h1 { margin: 4px 0 14px; font-size: 76px; line-height: 1; font-weight: 900; letter-spacing: -2px; color: #1d1320; }
+.wr-round { margin: 0; font-size: 28px; color: #4a3a44; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.wr-round span { background: #df1267; color: #fff; font-weight: 800; border-radius: 999px; padding: 8px 22px; font-size: 28px; }
+.wr-matches { display: grid; gap: 20px; margin-top: 32px; }
+.wr-match { background: #fff; border: 2px solid #f3c6d8; border-radius: 24px; padding: 26px 28px; }
+.wr-comp { margin: 0 0 10px; font-size: 20px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #7e103d; }
+.wr-line { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 24px; }
+.wr-team { font-size: 36px; line-height: 1.15; font-weight: 600; color: #4a3a44; overflow-wrap: anywhere; }
+.wr-team.away { text-align: right; }
+.wr-team.won { color: #1d1320; font-weight: 900; }
+.wr-score { display: inline-flex; align-items: center; gap: 14px; background: #df1267; color: #fff; font-size: 56px; font-weight: 900; line-height: 1; border-radius: 18px; padding: 14px 26px; font-variant-numeric: tabular-nums; }
+.wr-score i { font-style: normal; font-weight: 400; opacity: .8; }
+.wr-score.draw { background: #7e103d; }
+.wr-score.pending { background: #f6eaf0; color: #7e103d; font-size: 28px; font-weight: 700; padding: 20px 22px; }
+.wr-note { margin: 10px 0 0; text-align: center; font-size: 22px; font-weight: 700; color: #7e103d; }
+.wr-sections { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+.wr-section { background: #fdf0f5; border-radius: 14px; padding: 12px 8px; text-align: center; }
+.wr-section-name { display: block; font-size: 21px; font-weight: 700; color: #6b5562; text-transform: uppercase; letter-spacing: .5px; }
+.wr-section-score { display: inline-flex; gap: 8px; margin-top: 4px; font-size: 34px; font-variant-numeric: tabular-nums; color: #6b5562; }
+.wr-section-score b { font-weight: 600; }
+.wr-section-score b.win { color: #df1267; font-weight: 900; }
+.wr-section-score i { font-style: normal; color: #b39aa7; }
+.wr-empty { margin: 48px 0; text-align: center; font-size: 30px; color: #6b5562; }
+.wr-bye { margin: 24px 0 0; font-size: 28px; text-align: center; color: #4a3a44; }
+.wr-bye strong { color: #1d1320; }
+.wr-foot { margin-top: 28px; padding-top: 22px; border-top: 3px solid #f6d5e2; text-align: center; font-size: 22px; color: #6b5562; line-height: 1.45; }
+.wr-foot p { margin: 0; }
+.wr-brand { margin-top: 8px !important; font-weight: 700; color: #7e103d; }
+.share-actions { display: flex; flex-wrap: wrap; gap: 10px; align-self: end; }
+.poster-emblem-img { width: 124px; height: 124px; object-fit: contain; }
+.weekly-poster .poster-header { grid-template-columns: 130px minmax(0, 1fr) 130px; }
+.brand-mark img { width: 48px; height: 48px; }
+.brand-mark:has(img) { background: none; border-radius: 0; }
+.login .brand-mark, .login .brand-mark img { width: 104px; height: 104px; }
+.login .brand-mark { margin: 0 auto 8px; }

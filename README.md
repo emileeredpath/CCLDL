@@ -229,3 +229,26 @@ Production setup in **Supabase → Authentication → URL Configuration**:
 - Verify email delivery for both committee accounts. If Supabase's default email provider restricts recipients, configure a production SMTP provider under Authentication email settings. App tests mock email delivery; they do not prove real inbox delivery.
 
 No database migration is required. Account creation and committee membership remain administrator-controlled.
+
+### Weekly results image, sharing and crest (November 2026)
+
+Weekly Overview now opens on **This week's results**: one image per round with
+every match score, the four League section scores (Pairs, Trebles, Captains &
+Vice, Singles) with the winning side in pink, the bye team and a note for any
+result not yet approved. Drafts never appear. Rounds are named from the saved
+fixtures ("League 4", "Cup 2"); a date with fewer than three fixtures of a
+competition is shown as catch-up matches. The image is 1080px wide (2160px
+exported) so it reads well on a phone.
+
+**Share** renders the selected image and opens the phone's share menu, so it
+can go straight to WhatsApp or Facebook. Browsers that cannot share files
+(most desktop browsers) download the image instead and say so. **Download**
+always saves the PNG. Nothing is posted automatically.
+
+The pink CCLDL crest (`public/ccldl-crest.png`) replaces the target icon in the
+sign-in screen, sidebar, standings poster and results image. The home-screen
+icons (`icon-192.png`, `icon-512.png`) use the crest on a light pink square.
+Phones that installed the app earlier may keep the old icon until it is
+removed and added to the home screen again.
+
+Calculation logic: `src/lib/weekly-results.ts`; tests: `tests/weekly-results.test.ts`.
