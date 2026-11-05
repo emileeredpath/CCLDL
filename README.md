@@ -252,3 +252,12 @@ Phones that installed the app earlier may keep the old icon until it is
 removed and added to the home screen again.
 
 Calculation logic: `src/lib/weekly-results.ts`; tests: `tests/weekly-results.test.ts`.
+
+**Double 1s follow Rule 16.** The Pitt Stop trophy counts only Double 1
+finishes from 2 left, and never in the Captains & Vice game or Cup games.
+Player statistics therefore add up Double 1s from League results only.
+Detailed game-by-game results skip the Captains & Vice game automatically;
+for category-total results the committee enters only qualifying finishes, as
+the entry form reminds them. Highest score and highest checkout still use
+League and Cup results. Existing records are not changed: totals are
+recalculated from saved results.

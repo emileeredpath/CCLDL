@@ -29,7 +29,8 @@ export function playerStatistics(
         score: 0,
         checkout: 0,
       };
-      row.d1 += p.double_ones;
+      // Rule 16: the Pitt Stop trophy counts League Double 1 finishes only.
+      if (r.competition === "league") row.d1 += p.double_ones;
       row.score = Math.max(
         row.score,
         p.highest_score ?? 0,
@@ -58,11 +59,9 @@ export function rankedStats(
         a.name.localeCompare(b.name) ||
         a.id.localeCompare(b.id),
     );
-  return sorted
-    .slice(0, limit)
-    .map((s, i) => ({
-      ...s,
-      rank: sorted.findIndex((x) => x[key] === s[key]) + 1,
-      joint: sorted.filter((x) => x[key] === s[key]).length > 1,
-    }));
+  return sorted.slice(0, limit).map((s, i) => ({
+    ...s,
+    rank: sorted.findIndex((x) => x[key] === s[key]) + 1,
+    joint: sorted.filter((x) => x[key] === s[key]).length > 1,
+  }));
 }

@@ -346,7 +346,12 @@ export default function Workspace() {
         summary: r.summary,
         achievements: Object.values(
           r.games
-            .flatMap((g: { game_players: PlayerEntry[] }) => g.game_players)
+            .flatMap((g: { kind: string; game_players: PlayerEntry[] }) =>
+              // Rule 16: Captains & Vice finishes never count as Double 1s.
+              g.kind === "Captains & vice"
+                ? g.game_players.map((p) => ({ ...p, double_ones: 0 }))
+                : g.game_players,
+            )
             .reduce((acc: Record<string, PlayerEntry>, p: PlayerEntry) => {
               const old = acc[p.player_id];
               acc[p.player_id] = {
@@ -1255,8 +1260,9 @@ export default function Workspace() {
             )}
             <h2>Player statistics</h2>
             <p className="muted">
-              Cumulative season totals · League and Cup combined · through{" "}
-              {dateLabel(week)}
+              Season totals through{" "}
+              {dateLabel(week)} · Double 1s are League only (Rule 16) ·
+              Highest score and checkout include League and Cup
             </p>
             <div className="filter-pills" aria-label="Player statistic">
               {(

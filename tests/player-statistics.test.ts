@@ -29,31 +29,20 @@ const match = (
     },
   ],
 });
-test("Double 1 season totals include repeated finishes and both competitions, corrected/deleted results recalculate", () => {
+test("Double 1 totals count repeated League finishes only (Rule 16); corrected results recalculate", () => {
   const a = match("1", 3),
     b = match("2", 2, "cup");
-  assert.equal(
-    playerStatistics([a, b], players, teams, "2026/27", "2026-10-22")[0].d1,
-    5,
-  );
-  assert.equal(
-    playerStatistics([a, a, b], players, teams, "2026/27", "2026-10-22")[0].d1,
-    5,
-  );
-  assert.equal(
-    playerStatistics(
-      [match("1", 1), b],
-      players,
-      teams,
-      "2026/27",
-      "2026-10-22",
-    )[0].d1,
-    3,
-  );
-  assert.equal(
-    playerStatistics([b], players, teams, "2026/27", "2026-10-22")[0].d1,
-    2,
-  );
+  const stats = (rs: Result[]) =>
+    playerStatistics(rs, players, teams, "2026/27", "2026-10-22")[0];
+  // Every League finish counts; Cup finishes are left out.
+  assert.equal(stats([a, b]).d1, 3);
+  // A result saved twice is still counted once.
+  assert.equal(stats([a, a, b]).d1, 3);
+  // A correction replaces the old count rather than adding to it.
+  assert.equal(stats([match("1", 1), b]).d1, 1);
+  // Cup alone gives no Double 1s, but the Cup high score still counts.
+  assert.equal(stats([b]).d1, 0);
+  assert.equal(stats([b]).score, 100);
 });
 test("stable IDs and season/cutoff/approval boundaries prevent incorrect totals", () => {
   const a = match("1", 3);

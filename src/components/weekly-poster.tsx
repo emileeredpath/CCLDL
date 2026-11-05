@@ -39,7 +39,7 @@ export default function WeeklyPoster({
         <p>{season} WEEKLY STANDINGS</p>
         <small>
           Through {new Date(week + "T12:00:00").toLocaleDateString("en-GB")} ·
-          League & Cup combined player statistics
+          Double 1s League only · scores and checkouts League & Cup
           {demo ? " · FICTIONAL DEMONSTRATION" : ""}
         </small></div><img className="poster-emblem-img" src="/ccldl-crest.png" alt="" />
       </header>
