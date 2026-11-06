@@ -298,3 +298,96 @@ button:focus-visible {
 .weekly-poster .poster-block h2 small {
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * Crest palette across the app, matching the weekly images: berry leads,
+ * the darts' pink (#da3074) is kept for small highlights only.
+ */
+:root {
+  --pink: #7e103d;
+  --pink-text: #7e103d;
+  --tint: #f6eff2;
+  --tint-strong: #fbf1f5;
+  --dart-pink: #da3074;
+}
+.primary {
+  background: var(--berry);
+  color: #fff;
+}
+.primary:hover {
+  background: #650c31;
+}
+.secondary {
+  background: var(--tint);
+  color: var(--berry);
+}
+.secondary:hover {
+  background: #efe3e8;
+}
+.badge,
+.score,
+.avatar,
+.tab-group button,
+.player-picker [aria-selected="true"],
+.score-summary-row.total {
+  background: var(--tint);
+  color: var(--berry);
+}
+.tab-group button.selected,
+.tab-group button[aria-selected="true"] {
+  background: var(--berry);
+  color: #fff;
+}
+.filter-pills .selected {
+  background: var(--tint-strong);
+  border-color: #e2c6d3;
+  color: var(--berry);
+}
+.eyebrow,
+.pts,
+.match-score,
+a {
+  color: var(--berry);
+}
+.hero .eyebrow {
+  color: #ffc2d8;
+}
+.sidebar .eyebrow {
+  color: #f19ab9;
+}
+.sidebar .nav-item.active {
+  background: var(--dart-pink);
+}
+.notice {
+  background: var(--tint-strong);
+  border-color: #eadde3;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline-color: #e59ab8;
+}
+@media (max-width: 640px) {
+  .bottom button.active {
+    background: var(--tint);
+    color: var(--berry);
+  }
+}
+@media (max-width: 640px) {
+  /* The sidebar is hidden on phones, so the crest sits in the header. */
+  .topbar > div:first-child {
+    padding-left: 56px;
+    min-height: 46px;
+    background: url("/ccldl-crest.png") left center / 46px 46px no-repeat;
+  }
+}
+@media (max-width: 640px) {
+  .topbar > div:first-child .muted {
+    display: none;
+  }
+  .topbar > div:first-child {
+    display: flex;
+    align-items: center;
+  }
+}
