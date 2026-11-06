@@ -467,3 +467,98 @@ export function AllInOneImage({
     </div>
   );
 }
+
+export type RoundResults = {
+  date: string;
+  label: string;
+  matches: WeeklyMatch[];
+};
+
+/** Rounds per "Results so far" image: two columns of five. */
+export const ROUNDS_PER_PAGE = 10;
+
+/** "Results so far": every round to date, newest first, in pages of ten. */
+export function ResultsSoFarImage({
+  season,
+  week,
+  rounds,
+  page,
+  pages,
+  demo,
+}: {
+  season: string;
+  week: string;
+  rounds: RoundResults[];
+  page: number;
+  pages: number;
+  demo: boolean;
+}) {
+  return (
+    <div className="ai rs">
+      <header className="ai-band">
+        <img className="ai-crest" src="/ccldl-crest.png" alt="" />
+        <div>
+          <p className="si-league">Chelmsford City Ladies Darts League</p>
+          <h1>Results so far</h1>
+          <p className="ai-sub">
+            {season} season · through {longDate(week)}
+          </p>
+        </div>
+        {pages > 1 && (
+          <span className="si-tag">
+            {page} of {pages}
+          </span>
+        )}
+      </header>
+      <div className="ai-body">
+        {rounds.length ? (
+          <div className="rs-grid">
+            {rounds.map((r) => (
+              <section className="ai-card rs-round" key={r.date}>
+                <h2>
+                  {r.label}
+                  <small>{longDate(r.date).replace(/^\w+ /, "")}</small>
+                </h2>
+                <ul>
+                  {r.matches.map((m) => {
+                    const done = m.homeWins !== null && m.awayWins !== null;
+                    return (
+                      <li key={m.fixtureId}>
+                        <span
+                          className={
+                            done && m.homeWins! > m.awayWins! ? "won" : ""
+                          }
+                        >
+                          {m.home}
+                        </span>
+                        <i className={done ? "" : "pending"}>
+                          {done ? `${m.homeWins}–${m.awayWins}` : "TBC"}
+                        </i>
+                        <span
+                          className={`away ${done && m.awayWins! > m.homeWins! ? "won" : ""}`}
+                        >
+                          {m.away}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <p className="si-empty">No matches played yet this season.</p>
+        )}
+      </div>
+      <footer className="ai-foot">
+        <p>
+          Newest week first · Winners in bold · TBC = result not yet confirmed
+        </p>
+        <p className="si-brand">
+          Chelmsford City Ladies Darts League · {season}
+          {demo ? " · FICTIONAL DEMONSTRATION" : ""}
+        </p>
+      </footer>
+    </div>
+  );
+}

@@ -711,3 +711,63 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Results so far: rounds in two columns of five. */
+.rs .ai-band .si-tag {
+  margin-left: auto;
+  align-self: flex-start;
+}
+.rs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.rs-round {
+  padding: 10px 14px 8px;
+}
+.rs-round h2 {
+  padding: 0 0 6px;
+  font-size: 18px;
+}
+.rs-round ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rs-round li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 5px 0;
+  border-top: 1px solid #f1e8ec;
+  font-size: 14.5px;
+  line-height: 1.15;
+}
+.rs-round li span {
+  color: #6e6168;
+  font-weight: 600;
+}
+.rs-round li span.won {
+  color: #241820;
+  font-weight: 800;
+}
+.rs-round li span.away {
+  text-align: right;
+}
+.rs-round li i {
+  font-family: "Montserrat", Arial, sans-serif;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 16px;
+  text-align: center;
+  background: #7e103d;
+  color: #fff;
+  border-radius: 8px;
+  padding: 4px 0;
+}
+.rs-round li i.pending {
+  background: #f6eff2;
+  color: #7e103d;
+  font-size: 13px;
+}

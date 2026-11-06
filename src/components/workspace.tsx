@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createRef, type FormEvent, useEffect, useRef, useState } from "react";
 import {
   Home,
   CalendarDays,
@@ -30,6 +30,8 @@ import {
   AllInOneImage,
   CupAwardsImage,
   LeagueImage,
+  ResultsSoFarImage,
+  ROUNDS_PER_PAGE,
 } from "@/components/share-images";
 import WeeklyResults from "@/components/weekly-results";
 import {
@@ -285,7 +287,12 @@ export default function Workspace() {
   const [review, setReview] = useState(false);
   const [archivePreview, setArchivePreview] = useState("");
   const [history, setHistory] = useState<string[]>([]);
-  const [imageLayout, setImageLayout] = useState<"one" | "three">("one");
+  const [imageLayout, setImageLayout] = useState<"one" | "three" | "sofar">(
+    "one",
+  );
+  const soFarRefs = useRef(
+    Array.from({ length: 6 }, () => createRef<HTMLDivElement>()),
+  ).current;
   const allRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const leagueRef = useRef<HTMLDivElement>(null);
@@ -2062,8 +2069,42 @@ export default function Workspace() {
                   ready: statsReady,
                 },
               ];
+              const soFar = rounds
+                .filter((r) => r.date <= week)
+                .reverse()
+                .map((r) => ({
+                  date: r.date,
+                  label: r.label,
+                  matches: weeklyMatches(
+                    fixtures.filter((f) => demo || f.season === season),
+                    results,
+                    r.date,
+                    season,
+                  ),
+                }));
+              const soFarPages = Array.from(
+                {
+                  length: Math.min(
+                    soFarRefs.length,
+                    Math.max(1, Math.ceil(soFar.length / ROUNDS_PER_PAGE)),
+                  ),
+                },
+                (_, i) =>
+                  soFar.slice(i * ROUNDS_PER_PAGE, (i + 1) * ROUNDS_PER_PAGE),
+              );
               const images =
-                imageLayout === "one"
+                imageLayout === "sofar"
+                  ? soFarPages.map((_, i) => ({
+                      key: `sofar-${i}`,
+                      title:
+                        soFarPages.length > 1
+                          ? `Results so far (${i + 1} of ${soFarPages.length})`
+                          : "Results so far",
+                      ref: soFarRefs[i],
+                      file: `CCLDL-results-so-far-${tag}${soFarPages.length > 1 ? `-${i + 1}` : ""}${suffix}.png`,
+                      ready: true,
+                    }))
+                  : imageLayout === "one"
                   ? [
                       {
                         key: "all",
@@ -2095,7 +2136,16 @@ export default function Workspace() {
               };
               const allReady = images.every((i) => i.ready) && !busy;
               const preview = (key: string) =>
-                key === "results" ? (
+                key.startsWith("sofar-") ? (
+                  <ResultsSoFarImage
+                    season={season}
+                    week={week}
+                    rounds={soFarPages[Number(key.slice(6))]}
+                    page={Number(key.slice(6)) + 1}
+                    pages={soFarPages.length}
+                    demo={demo}
+                  />
+                ) : key === "results" ? (
                   shownRound ? (
                     <WeeklyResults
                       season={season}
@@ -2182,6 +2232,15 @@ export default function Workspace() {
                         >
                           Three images
                         </button>
+                        <button
+                          className={
+                            imageLayout === "sofar" ? "primary" : "secondary"
+                          }
+                          aria-pressed={imageLayout === "sofar"}
+                          onClick={() => setImageLayout("sofar")}
+                        >
+                          Results so far
+                        </button>
                       </div>
                     </div>
                     <div className="fields">
@@ -2204,7 +2263,7 @@ export default function Workspace() {
                           }
                         >
                           <Share2 size={16} />{" "}
-                          {images.length > 1 ? "Share all 3" : "Share"}
+                          {images.length > 1 ? `Share all ${images.length}` : "Share"}
                         </button>
                         <button
                           className="secondary"
