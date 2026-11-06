@@ -21,6 +21,8 @@ for (const name of [
   "202610130001_initial.sql",
   "202610130002_summary_results.sql",
   "202610140001_pending_achievements.sql",
+  "202610150001_remove_duplicate_sheets.sql",
+  "202611060001_cup_format.sql",
 ])
   await db.exec(
     fs.readFileSync(
@@ -40,7 +42,7 @@ const summary = {
       double_ones: 2,
       highest_score: 140,
       highest_checkout: null,
-      recorded_scores: [100,140],
+      recorded_scores: [100, 140],
     },
   ],
 };
@@ -50,7 +52,11 @@ const save = (s, sheet = "00000000-0000-0000-0000-000000000006") =>
     [sheet, JSON.stringify(s)],
   );
 await save(summary);
-assert.deepEqual((await db.query("select summary from results limit 1")).rows[0].summary.achievements[0].recorded_scores,[100,140]);
+assert.deepEqual(
+  (await db.query("select summary from results limit 1")).rows[0].summary
+    .achievements[0].recorded_scores,
+  [100, 140],
+);
 assert.equal(
   (await db.query("select status from results")).rows[0].status,
   "approved",
@@ -263,14 +269,65 @@ await assert.rejects(save(summary));
 console.log(
   "PASS: migrations; summary save/edit and validation; private access; audit/original retention; Cup totals; legacy save/edit and conversion protection.",
 );
-await db.exec("reset role; create or replace function auth.uid() returns uuid language sql as $$ select '00000000-0000-0000-0000-000000000001'::uuid $$;");
-await db.exec(fs.readFileSync(new URL("../../supabase/migrations/202610150001_remove_duplicate_sheets.sql", import.meta.url), "utf8"));
-const linked = (await db.query("select sheet_id,fixture_id,id,status from results where sheet_id is not null limit 1")).rows[0];
-await assert.rejects(db.query("select remove_result_sheet($1)", [linked.sheet_id]), /original linked/);
-const extra = (await db.query("insert into result_sheets(fixture_id,storage_path) values($1,'test/duplicate.jpg') returning id", [linked.fixture_id])).rows[0].id;
+await db.exec(
+  "reset role; create or replace function auth.uid() returns uuid language sql as $$ select '00000000-0000-0000-0000-000000000001'::uuid $$;",
+);
+await db.exec(
+  fs.readFileSync(
+    new URL(
+      "../../supabase/migrations/202610150001_remove_duplicate_sheets.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+const linked = (
+  await db.query(
+    "select sheet_id,fixture_id,id,status from results where sheet_id is not null limit 1",
+  )
+).rows[0];
+await assert.rejects(
+  db.query("select remove_result_sheet($1)", [linked.sheet_id]),
+  /original linked/,
+);
+const extra = (
+  await db.query(
+    "insert into result_sheets(fixture_id,storage_path) values($1,'test/duplicate.jpg') returning id",
+    [linked.fixture_id],
+  )
+).rows[0].id;
 await db.query("select remove_result_sheet($1)", [extra]);
-assert((await db.query("select removed_at from result_sheets where id=$1", [extra])).rows[0].removed_at);
-await assert.rejects(db.query("update results set sheet_id=$1 where id=$2", [extra,linked.id]), /active original/);
-assert.equal((await db.query("select status from results where id=$1", [linked.id])).rows[0].status,linked.status);
-console.log("PASS: duplicate removal retains original, protects linked sheet, preserves result and rejects relinking removed sheets.");
+assert(
+  (await db.query("select removed_at from result_sheets where id=$1", [extra]))
+    .rows[0].removed_at,
+);
+await assert.rejects(
+  db.query("update results set sheet_id=$1 where id=$2", [extra, linked.id]),
+  /active original/,
+);
+assert.equal(
+  (await db.query("select status from results where id=$1", [linked.id]))
+    .rows[0].status,
+  linked.status,
+);
+console.log(
+  "PASS: duplicate removal retains original, protects linked sheet, preserves result and rejects relinking removed sheets.",
+);
+// Cup format: defaults to round robin and only accepts the two formats.
+{
+  await db.exec(
+    "insert into seasons(name,starts_on,ends_on) values('Format check','2030-01-01','2030-12-31')",
+  );
+  const f = await db.query(
+    "select cup_format from seasons where name='Format check'",
+  );
+  assert.equal(f.rows[0].cup_format, "round_robin");
+  await db.exec(
+    "update seasons set cup_format='knockout' where name='Format check'",
+  );
+  await assert.rejects(
+    db.exec("update seasons set cup_format='league' where name='Format check'"),
+  );
+  console.log("cup format ok");
+}
 await db.close();

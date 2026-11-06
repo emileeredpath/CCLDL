@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   playerStatistics,
+  type CupFormat,
   rankedStats,
   type PlayerStat,
 } from "@/lib/player-statistics";
@@ -84,6 +85,7 @@ type Fixture = {
   away_team_id?: string;
 };
 type Option = { id: string; name: string; team_id?: string };
+type SeasonOption = Option & { cup_format?: CupFormat };
 type PlayerEntry = {
   player_id: string;
   side: "home" | "away";
@@ -258,7 +260,7 @@ export default function Workspace() {
   const [saveError, setSaveError] = useState("");
   const [results, setResults] = useState<Result[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [seasons, setSeasons] = useState<Option[]>([]);
+  const [seasons, setSeasons] = useState<SeasonOption[]>([]);
   const [teams, setTeams] = useState<Option[]>([]);
   const [players, setPlayers] = useState<Option[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
@@ -335,7 +337,16 @@ export default function Workspace() {
     const capability = await client.from("results").select("summary").limit(0);
     if (request !== loadSequence.current) return;
     setSummaryReady(!capability.error);
-    const ss = responses[0].data ?? [];
+    // The Cup format column arrives with a database update. Until it is
+    // applied, every season is treated as a round robin Cup.
+    const formats = await client.from("seasons").select("id,cup_format");
+    if (request !== loadSequence.current) return;
+    const ss: SeasonOption[] = (responses[0].data ?? []).map((s) => ({
+      ...s,
+      cup_format: formats.error
+        ? undefined
+        : formats.data?.find((f) => f.id === s.id)?.cup_format,
+    }));
     const ts = responses[1].data ?? [];
     const ps = responses[2].data ?? [];
     setSeasons(ss);
@@ -419,7 +430,16 @@ export default function Workspace() {
     });
     setResults(mappedResults);
     setSheets((responses[5].data ?? []).filter((s) => !s.removed_at));
-    setStats(playerStatistics(mappedResults, ps, ts, season, week));
+    setStats(
+      playerStatistics(
+        mappedResults,
+        ps,
+        ts,
+        season,
+        week,
+        ss.find((s) => s.name === season)?.cup_format ?? "round_robin",
+      ),
+    );
     setLoadedScope([season, competition, week].join(":"));
   }
   useEffect(() => {
@@ -1282,8 +1302,8 @@ export default function Workspace() {
             )}
             <h2>Player statistics</h2>
             <p className="muted">
-              Season totals through {dateLabel(week)} · League and Cup
-              combined · Double 1s leave out the Captains &amp; Vice game
+              Season totals through {dateLabel(week)} · League and Cup combined
+              · Double 1s leave out the Captains &amp; Vice game
             </p>
             <div className="filter-pills" aria-label="Player statistic">
               {(
@@ -2104,16 +2124,16 @@ export default function Workspace() {
                       ready: true,
                     }))
                   : imageLayout === "one"
-                  ? [
-                      {
-                        key: "all",
-                        title: "Weekly standings",
-                        ref: allRef,
-                        file: `CCLDL-weekly-${tag}${suffix}.png`,
-                        ready: statsReady,
-                      },
-                    ]
-                  : set;
+                    ? [
+                        {
+                          key: "all",
+                          title: "Weekly standings",
+                          ref: allRef,
+                          file: `CCLDL-weekly-${tag}${suffix}.png`,
+                          ready: statsReady,
+                        },
+                      ]
+                    : set;
               const caption = `Chelmsford City Ladies Darts League · ${shownRound?.label ?? season}`;
               const note = (outcome: string) => {
                 if (outcome === "downloaded")
@@ -2262,7 +2282,9 @@ export default function Workspace() {
                           }
                         >
                           <Share2 size={16} />{" "}
-                          {images.length > 1 ? `Share all ${images.length}` : "Share"}
+                          {images.length > 1
+                            ? `Share all ${images.length}`
+                            : "Share"}
                         </button>
                         <button
                           className="secondary"
@@ -2460,11 +2482,27 @@ function SetupForms({
   clientReady: boolean;
   players: Option[];
   teams: Option[];
-  seasons: Option[];
+  seasons: SeasonOption[];
   reload: () => Promise<void>;
   notify: (s: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const formatReady = seasons.some((s) => s.cup_format);
+  async function changeCupFormat(season: SeasonOption, cup_format: string) {
+    if (!client || !clientReady || busy) return;
+    setBusy(true);
+    const r = await client
+      .from("seasons")
+      .update({ cup_format })
+      .eq("id", season.id);
+    setBusy(false);
+    notify(
+      r.error
+        ? r.error.message
+        : `${season.name} Cup set to ${cup_format === "knockout" ? "knockout" : "round robin"}. Double 1s totals have been recalculated.`,
+    );
+    if (!r.error) await reload();
+  }
   const [rosterSearch, setRosterSearch] = useState("");
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState("");
@@ -2745,6 +2783,31 @@ function SetupForms({
           Save fixture
         </button>
       </form>
+      {formatReady && (
+        <section aria-label="Cup format">
+          <h3>Cup format</h3>
+          <p className="muted">
+            Cup Double 1s count towards the Pitt Stop Madhouse Trophy only when
+            the Cup is a round robin. In a knockout season only League Double 1s
+            count.
+          </p>
+          <div className="fields">
+            {seasons.map((s) => (
+              <label key={s.id}>
+                {s.name}
+                <select
+                  value={s.cup_format ?? "round_robin"}
+                  disabled={!clientReady || busy}
+                  onChange={(e) => changeCupFormat(s, e.target.value)}
+                >
+                  <option value="round_robin">Round robin</option>
+                  <option value="knockout">Knockout</option>
+                </select>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
       <form onSubmit={(e) => submit(e, "seasons")}>
         <h3>Add a season</h3>
         <div className="fields">
@@ -2760,6 +2823,15 @@ function SetupForms({
             Ends on
             <input type="date" name="ends_on" required />
           </label>
+          {formatReady && (
+            <label>
+              Cup format
+              <select name="cup_format" defaultValue="round_robin">
+                <option value="round_robin">Round robin</option>
+                <option value="knockout">Knockout</option>
+              </select>
+            </label>
+          )}
         </div>
         <button
           className="secondary"

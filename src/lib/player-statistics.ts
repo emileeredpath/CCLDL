@@ -7,12 +7,16 @@ export type PlayerStat = {
   score: number;
   checkout: number;
 };
+/** How the season's Cup is played, set per season in Season administration. */
+export type CupFormat = "round_robin" | "knockout";
+
 export function playerStatistics(
   results: Result[],
   players: { id: string; name: string; team_id?: string }[],
   teams: { id: string; name: string }[],
   season: string,
   cutoff: string,
+  cupFormat: CupFormat = "round_robin",
 ): PlayerStat[] {
   const totals = new Map<string, PlayerStat>();
   for (const r of new Map(
@@ -29,10 +33,12 @@ export function playerStatistics(
         score: 0,
         checkout: 0,
       };
-      // League and Cup Double 1s both count: the Cup is a round robin, so every
-      // team plays the same number of Cup games. (Captains & Vice finishes are
-      // left out when results are entered, per Rule 16.)
-      row.d1 += p.double_ones;
+      // Cup Double 1s count only in a round robin Cup, where every team plays
+      // the same number of Cup games. In a knockout Cup only League Double 1s
+      // count. (Captains & Vice finishes are left out when results are
+      // entered, per Rule 16.)
+      if (r.competition !== "cup" || cupFormat === "round_robin")
+        row.d1 += p.double_ones;
       row.score = Math.max(
         row.score,
         p.highest_score ?? 0,

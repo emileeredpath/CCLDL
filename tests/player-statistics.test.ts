@@ -44,6 +44,22 @@ test("Double 1 totals count every League and Cup finish; corrected results recal
   assert.equal(stats([b]).score, 100);
 });
 
+test("in a knockout Cup season only League Double 1s count", () => {
+  const a = match("1", 3),
+    b = match("2", 2, "cup");
+  const stat = playerStatistics(
+    [a, b],
+    players,
+    teams,
+    "2026/27",
+    "2026-10-22",
+    "knockout",
+  )[0];
+  assert.equal(stat.d1, 3);
+  // Highest score and checkout from the Cup still count.
+  assert.equal(stat.score, 100);
+});
+
 test("stable IDs and season/cutoff/approval boundaries prevent incorrect totals", () => {
   const a = match("1", 3);
   assert.equal(

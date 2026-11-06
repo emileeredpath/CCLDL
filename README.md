@@ -254,10 +254,13 @@ removed and added to the home screen again.
 Calculation logic: `src/lib/weekly-results.ts`; tests: `tests/weekly-results.test.ts`.
 
 **Double 1s (Pitt Stop trophy).** Only finishes from 2 left count, and never
-in the Captains & Vice game (Rule 16). League and Cup Double 1s both count:
-the committee confirmed in November 2026 that Rule 16's Cup exclusion dates
-from when the Cup was a knockout, and it is now a round robin where every
-team plays the same number of games. Detailed game-by-game results skip the
+in the Captains & Vice game (Rule 16). Cup Double 1s count only when that
+season's Cup is a round robin, where every team plays the same number of
+games; in a knockout season only League Double 1s count (committee decision,
+November 2026). Each season's Cup format is set under Season administration
+and defaults to round robin. It needs the migration
+`supabase/migrations/202611060001_cup_format.sql`; until that is applied,
+every season is treated as round robin and the setting stays hidden. Detailed game-by-game results skip the
 Captains & Vice game automatically; for category-total results the committee
 enters only qualifying finishes, as the entry form reminds them. Totals are
 recalculated from saved results.
