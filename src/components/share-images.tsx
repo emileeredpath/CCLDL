@@ -477,7 +477,7 @@ export type RoundResults = {
 /** Rounds per "Results so far" image: two columns of five. */
 export const ROUNDS_PER_PAGE = 10;
 
-/** "Results so far": every round to date, newest first, in pages of ten. */
+/** "Results so far": every round to date in date order, in pages of ten. */
 export function ResultsSoFarImage({
   season,
   week,
@@ -552,7 +552,7 @@ export function ResultsSoFarImage({
       </div>
       <footer className="ai-foot">
         <p>
-          Newest week first · Winners in bold · TBC = result not yet confirmed
+          In date order · Winners in bold · TBC = result not yet confirmed
         </p>
         <p className="si-brand">
           Chelmsford City Ladies Darts League · {season}

@@ -2071,7 +2071,6 @@ export default function Workspace() {
               ];
               const soFar = rounds
                 .filter((r) => r.date <= week)
-                .reverse()
                 .map((r) => ({
                   date: r.date,
                   label: r.label,
