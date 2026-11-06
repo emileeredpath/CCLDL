@@ -28,7 +28,7 @@ test("weekly image includes all nine teams in both tables and only five ranked p
   assert.equal(html.split("Test Player 4").length - 1, 3);
   assert(!html.includes("Test Player 5"));
   assert(html.includes("Win 2"));
-  assert(html.includes("Double 1s League only"));
+  assert(html.includes("League &amp; Cup combined"));
 });
 test("weekly league table includes category points and total", () => {
   const html = renderToStaticMarkup(createElement(WeeklyPoster, {

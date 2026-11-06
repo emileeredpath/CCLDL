@@ -29,8 +29,10 @@ export function playerStatistics(
         score: 0,
         checkout: 0,
       };
-      // Rule 16: the Pitt Stop trophy counts League Double 1 finishes only.
-      if (r.competition === "league") row.d1 += p.double_ones;
+      // League and Cup Double 1s both count: the Cup is a round robin, so every
+      // team plays the same number of Cup games. (Captains & Vice finishes are
+      // left out when results are entered, per Rule 16.)
+      row.d1 += p.double_ones;
       row.score = Math.max(
         row.score,
         p.highest_score ?? 0,

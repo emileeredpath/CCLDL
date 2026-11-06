@@ -93,7 +93,7 @@ export default function SummaryEntry({
       </p>
       <p className="muted">
         {cup
-          ? "Cup Double 1s don't count towards the Pitt Stop trophy (Rule 16), so they are left out of the totals."
+          ? "Double 1s: count only finishes from 2 left."
           : "Double 1s: count only finishes from 2 left, and leave out the Captains & Vice game (Rule 16)."}
       </p>
       {value.notes && <p className="notice">{value.notes}</p>}
