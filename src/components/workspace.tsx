@@ -26,7 +26,11 @@ import { normalise } from "@/lib/player-csv";
 import PlayerCsvImport from "@/components/player-csv-import";
 import MatchSummary from "@/components/match-summary";
 import PosterPreview from "@/components/poster-preview";
-import { CupAwardsImage, LeagueImage } from "@/components/share-images";
+import {
+  AllInOneImage,
+  CupAwardsImage,
+  LeagueImage,
+} from "@/components/share-images";
 import WeeklyResults from "@/components/weekly-results";
 import {
   download,
@@ -281,6 +285,8 @@ export default function Workspace() {
   const [review, setReview] = useState(false);
   const [archivePreview, setArchivePreview] = useState("");
   const [history, setHistory] = useState<string[]>([]);
+  const [imageLayout, setImageLayout] = useState<"one" | "three">("one");
+  const allRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const leagueRef = useRef<HTMLDivElement>(null);
   const cupRef = useRef<HTMLDivElement>(null);
@@ -912,7 +918,9 @@ export default function Workspace() {
                 {busy ? "Signing in…" : "Secure sign in"}
                 <ShieldCheck size={17} />
               </button>
-              <p><a href="/forgot-password">Forgot password?</a></p>
+              <p>
+                <a href="/forgot-password">Forgot password?</a>
+              </p>
             </form>
           ) : (
             <div className="notice">
@@ -948,7 +956,8 @@ export default function Workspace() {
           <div className="result-row" key={s.id}>
             <span>
               <strong>
-                {key === "checkout" && `${s.rank}. `}{s.name}
+                {key === "checkout" && `${s.rank}. `}
+                {s.name}
               </strong>
               {s.team && <small className="player-team">{s.team}</small>}
             </span>
@@ -1266,9 +1275,8 @@ export default function Workspace() {
             )}
             <h2>Player statistics</h2>
             <p className="muted">
-              Season totals through{" "}
-              {dateLabel(week)} · Double 1s are League only (Rule 16) ·
-              Highest score and checkout include League and Cup
+              Season totals through {dateLabel(week)} · Double 1s are League
+              only (Rule 16) · Highest score and checkout include League and Cup
             </p>
             <div className="filter-pills" aria-label="Player statistic">
               {(
@@ -2031,7 +2039,7 @@ export default function Workspace() {
                   ? `after ${shownRound.label} · ${dateLabel(shownRound.date)}`
                   : `up to ${dateLabel(shownRound.date)}`
                 : `up to ${dateLabel(week)}`;
-              const images = [
+              const set = [
                 {
                   key: "results",
                   title: "1. This week's results",
@@ -2054,6 +2062,18 @@ export default function Workspace() {
                   ready: statsReady,
                 },
               ];
+              const images =
+                imageLayout === "one"
+                  ? [
+                      {
+                        key: "all",
+                        title: "Weekly standings",
+                        ref: allRef,
+                        file: `CCLDL-weekly-${tag}${suffix}.png`,
+                        ready: statsReady,
+                      },
+                    ]
+                  : set;
               const caption = `Chelmsford City Ladies Darts League · ${shownRound?.label ?? season}`;
               const note = (outcome: string) => {
                 if (outcome === "downloaded")
@@ -2066,7 +2086,9 @@ export default function Workspace() {
                 try {
                   await job();
                 } catch {
-                  setMessage("The image couldn't be created. Please try again.");
+                  setMessage(
+                    "The image couldn't be created. Please try again.",
+                  );
                 } finally {
                   setBusy(false);
                 }
@@ -2088,6 +2110,18 @@ export default function Workspace() {
                       No fixtures have been played yet this season.
                     </p>
                   )
+                ) : key === "all" ? (
+                  <AllInOneImage
+                    results={results}
+                    stats={stats}
+                    season={season}
+                    week={week}
+                    teamNames={seasonTeamNames}
+                    matches={roundMatches}
+                    roundLabel={shownRound?.label ?? "No fixtures yet"}
+                    roundDate={shownRound?.date ?? week}
+                    demo={demo}
+                  />
                 ) : key === "league" ? (
                   <LeagueImage
                     results={results}
@@ -2129,6 +2163,28 @@ export default function Workspace() {
                           ))}
                         </select>
                       </label>
+                      <div className="si-layout" aria-label="Image layout">
+                        <button
+                          className={
+                            imageLayout === "one" ? "primary" : "secondary"
+                          }
+                          aria-pressed={imageLayout === "one"}
+                          onClick={() => setImageLayout("one")}
+                        >
+                          One image
+                        </button>
+                        <button
+                          className={
+                            imageLayout === "three" ? "primary" : "secondary"
+                          }
+                          aria-pressed={imageLayout === "three"}
+                          onClick={() => setImageLayout("three")}
+                        >
+                          Three images
+                        </button>
+                      </div>
+                    </div>
+                    <div className="fields">
                       <div className="share-actions">
                         <button
                           className="primary"
@@ -2147,7 +2203,8 @@ export default function Workspace() {
                             )
                           }
                         >
-                          <Share2 size={16} /> Share all 3
+                          <Share2 size={16} />{" "}
+                          {images.length > 1 ? "Share all 3" : "Share"}
                         </button>
                         <button
                           className="secondary"
@@ -2164,15 +2221,16 @@ export default function Workspace() {
                             })
                           }
                         >
-                          <Download size={16} /> Download all
+                          <Download size={16} />{" "}
+                          {images.length > 1 ? "Download all" : "Download"}
                         </button>
                       </div>
                     </div>
                     <p className="muted">
                       On a phone, Share opens your share menu so you can send
-                      the images straight to WhatsApp or Facebook. Only
-                      approved results appear. Earlier weeks use the latest
-                      corrected results.
+                      the images straight to WhatsApp or Facebook. Only approved
+                      results appear. Earlier weeks use the latest corrected
+                      results.
                     </p>
                   </div>
                   <div className="si-set">
@@ -2187,40 +2245,42 @@ export default function Workspace() {
                         >
                           {preview(i.key)}
                         </PosterPreview>
-                        <div className="actions">
-                          <button
-                            className="primary"
-                            disabled={!i.ready || busy}
-                            onClick={() =>
-                              run(async () =>
-                                note(
-                                  await shareOrDownload(
+                        {images.length > 1 && (
+                          <div className="actions">
+                            <button
+                              className="primary"
+                              disabled={!i.ready || busy}
+                              onClick={() =>
+                                run(async () =>
+                                  note(
+                                    await shareOrDownload(
+                                      i.ref.current!,
+                                      i.file,
+                                      caption,
+                                    ),
+                                  ),
+                                )
+                              }
+                            >
+                              <Share2 size={16} /> Share
+                            </button>
+                            <button
+                              className="secondary"
+                              disabled={!i.ready || busy}
+                              onClick={() =>
+                                run(async () => {
+                                  const { url } = await renderPng(
                                     i.ref.current!,
                                     i.file,
-                                    caption,
-                                  ),
-                                ),
-                              )
-                            }
-                          >
-                            <Share2 size={16} /> Share
-                          </button>
-                          <button
-                            className="secondary"
-                            disabled={!i.ready || busy}
-                            onClick={() =>
-                              run(async () => {
-                                const { url } = await renderPng(
-                                  i.ref.current!,
-                                  i.file,
-                                );
-                                download(url, i.file);
-                              })
-                            }
-                          >
-                            <Download size={16} /> Download
-                          </button>
-                        </div>
+                                  );
+                                  download(url, i.file);
+                                })
+                              }
+                            >
+                              <Download size={16} /> Download
+                            </button>
+                          </div>
+                        )}
                       </section>
                     ))}
                   </div>

@@ -1,6 +1,7 @@
 import { categoryStandings } from "@/lib/result-summary";
 import { positions, standings, type Result } from "@/lib/standings";
 import { rankedStats, type PlayerStat } from "@/lib/player-statistics";
+import { longDate, type WeeklyMatch } from "@/lib/weekly-results";
 
 /** Shared top band for the weekly images: crest, league name, title. */
 export function ImageHeader({
@@ -253,6 +254,216 @@ export function CupAwardsImage({
         season={season}
         demo={demo}
       />
+    </div>
+  );
+}
+
+/**
+ * The single weekly image: League and Cup tables, the three Top 5 awards
+ * and this week's results, in one 1080 x 1350 picture.
+ */
+export function AllInOneImage({
+  results,
+  stats,
+  season,
+  week,
+  teamNames,
+  matches,
+  roundLabel,
+  roundDate,
+  demo,
+}: {
+  results: Result[];
+  stats: PlayerStat[];
+  season: string;
+  week: string;
+  teamNames: string[];
+  matches: WeeklyMatch[];
+  roundLabel: string;
+  roundDate: string;
+  demo: boolean;
+}) {
+  const league = positions(
+    standings(results, "league", week, season, teamNames),
+  );
+  const cup = positions(standings(results, "cup", week, season, teamNames));
+  const totals = sections.map(
+    ([kind]) =>
+      new Map(
+        categoryStandings(results, kind, season, week).map((r) => [
+          r.name,
+          r.value,
+        ]),
+      ),
+  );
+  return (
+    <div className="ai">
+      <header className="ai-band">
+        <img className="ai-crest" src="/ccldl-crest.png" alt="" />
+        <div>
+          <p className="si-league">Chelmsford City Ladies Darts League</p>
+          <h1>Weekly standings</h1>
+          <p className="ai-sub">
+            {season} season · through {longDate(week)}
+          </p>
+        </div>
+      </header>
+      <div className="ai-body">
+        <div className="ai-tables">
+          <div className="ai-card">
+            <h2>
+              League table <small>The Gail Wander Trophy</small>
+            </h2>
+            <table className="ai-table">
+              <thead>
+                <tr>
+                  <th>Pos</th>
+                  <th>Team</th>
+                  <th>P</th>
+                  <th>W</th>
+                  <th>D</th>
+                  <th>L</th>
+                  <th className="cat">Pairs</th>
+                  <th className="cat">Treb</th>
+                  <th className="cat">C&amp;V</th>
+                  <th className="cat">Sing</th>
+                  <th>Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {league.map((r) => (
+                  <tr
+                    key={r.team}
+                    className={r.played && r.rank === 1 ? "top" : ""}
+                  >
+                    <td className="pos">{r.label}</td>
+                    <td className="team">{r.team}</td>
+                    <td>{r.played}</td>
+                    <td>{r.won}</td>
+                    <td>{r.drawn}</td>
+                    <td>{r.lost}</td>
+                    {totals.map((t, i) => (
+                      <td className="cat" key={sections[i][0]}>
+                        {t.get(r.team) ?? (r.played ? "–" : 0)}
+                      </td>
+                    ))}
+                    <td className="pts">{r.points}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="ai-card">
+            <h2>
+              Cup table <small>Win 2 · Draw 1 · Loss 0</small>
+            </h2>
+            <table className="ai-table">
+              <thead>
+                <tr>
+                  <th>Pos</th>
+                  <th>Team</th>
+                  <th>P</th>
+                  <th>W</th>
+                  <th>D</th>
+                  <th>L</th>
+                  <th>Legs</th>
+                  <th>Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cup.map((r) => (
+                  <tr
+                    key={r.team}
+                    className={r.played && r.rank === 1 ? "top" : ""}
+                  >
+                    <td className="pos">{r.label}</td>
+                    <td className="team">{r.team}</td>
+                    <td>{r.played}</td>
+                    <td>{r.won}</td>
+                    <td>{r.drawn}</td>
+                    <td>{r.lost}</td>
+                    <td>
+                      {r.gamesFor}–{r.gamesAgainst}
+                    </td>
+                    <td className="pts">{r.points}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="ai-awards">
+          {awardList.map(([key, title, trophy]) => {
+            const ranked = rankedStats(stats, key, 5);
+            return (
+              <section className="ai-card ai-award" key={key}>
+                <h3>{title}</h3>
+                <p className="ai-trophy">{trophy}</p>
+                {ranked.length ? (
+                  <ol>
+                    {ranked.map((p, i) => (
+                      <li key={p.id} className={i === 0 ? "lead" : ""}>
+                        <b>{p.rank}</b>
+                        <span>
+                          {p.name}
+                          <small>{p.team || "–"}</small>
+                        </span>
+                        <span className="v">{p[key]}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="si-empty">No statistics recorded yet.</p>
+                )}
+              </section>
+            );
+          })}
+        </div>
+        <div className="ai-card ai-results">
+          <h2>
+            This week&apos;s results{" "}
+            <small>
+              {roundLabel} · {longDate(roundDate)}
+            </small>
+          </h2>
+          {matches.length ? (
+            <div className="ai-grid">
+              {matches.map((m) => {
+                const done = m.homeWins !== null && m.awayWins !== null;
+                return (
+                  <div className="ai-m" key={m.fixtureId}>
+                    <span
+                      className={done && m.homeWins! > m.awayWins! ? "won" : ""}
+                    >
+                      {m.home}
+                    </span>
+                    <i className={done ? "" : "pending"}>
+                      {done ? `${m.homeWins} – ${m.awayWins}` : "To follow"}
+                    </i>
+                    <span
+                      className={`away ${done && m.awayWins! > m.homeWins! ? "won" : ""}`}
+                    >
+                      {m.away}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="si-empty">No fixtures this week.</p>
+          )}
+        </div>
+      </div>
+      <footer className="ai-foot">
+        <p>
+          Points are games won · Teams level on points share a position · Legs =
+          for–against · Winners in bold · Double 1s count League finishes only
+        </p>
+        <p className="si-brand">
+          Chelmsford City Ladies Darts League · {season}
+          {demo ? " · FICTIONAL DEMONSTRATION" : ""}
+        </p>
+      </footer>
     </div>
   );
 }

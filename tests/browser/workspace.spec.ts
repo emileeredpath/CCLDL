@@ -67,6 +67,19 @@ test("Mobile demo navigation, tables, manual review warning and PNG download", a
     .getByRole("button", { name: "Weekly Overview", exact: true })
     .last()
     .click();
+  // One image is the default: tables, awards and this week's results together.
+  await expect(
+    page.getByRole("heading", { name: "Weekly standings", exact: true }).last(),
+  ).toBeVisible();
+  const single = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download", exact: true }).click();
+  const one = await single;
+  expect(one.suggestedFilename()).toMatch(/CCLDL-weekly-.*-DEMO.png/);
+  await one.saveAs("test-results/weekly-one.png");
+  const onePng = fs.readFileSync("test-results/weekly-one.png");
+  expect(onePng.readUInt32BE(16)).toBe(2160);
+  expect(onePng.readUInt32BE(20)).toBeGreaterThanOrEqual(2700);
+  await page.getByRole("button", { name: "Three images" }).click();
   // Three share images, each 1080 x 1350 or taller, exported at 2x.
   await expect(
     page.getByRole("heading", { name: "This week's results", exact: true }),
