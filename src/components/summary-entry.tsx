@@ -91,6 +91,11 @@ export default function SummaryEntry({
         Only add players with Double 1s, a highest score or a highest checkout.
         Leave unused boxes blank.
       </p>
+      <p className="muted">
+        {cup
+          ? "Double 1s: count only finishes from 2 left."
+          : "Double 1s: count only finishes from 2 left, and leave out the Captains & Vice game (Rule 16)."}
+      </p>
       {value.notes && <p className="notice">{value.notes}</p>}
       {value.ocr_review && (
         <details>

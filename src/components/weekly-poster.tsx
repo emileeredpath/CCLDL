@@ -1,6 +1,5 @@
-import { Target } from "lucide-react";
 import { categoryStandings } from "@/lib/result-summary";
-import { standings, type Result } from "@/lib/standings";
+import { positions, standings, type Result } from "@/lib/standings";
 import { rankedStats, type PlayerStat } from "@/lib/player-statistics";
 export type PosterStat = PlayerStat;
 export default function WeeklyPoster({
@@ -36,18 +35,20 @@ export default function WeeklyPoster({
   return (
     <>
       <header className="poster-header">
-        <Target className="poster-emblem" aria-hidden="true" /><div><h1>CHELMSFORD CITY LADIES DARTS LEAGUE</h1>
+        <img className="poster-emblem-img" src="/ccldl-crest.png" alt="" /><div><h1>CHELMSFORD CITY LADIES DARTS LEAGUE</h1>
         <p>{season} WEEKLY STANDINGS</p>
         <small>
           Through {new Date(week + "T12:00:00").toLocaleDateString("en-GB")} ·
           League & Cup combined player statistics
           {demo ? " · FICTIONAL DEMONSTRATION" : ""}
-        </small></div><Target className="poster-emblem" aria-hidden="true" />
+        </small></div><img className="poster-emblem-img" src="/ccldl-crest.png" alt="" />
       </header>
       {part !== "players" && (
         <div className="poster-main-tables">
           {(["league", "cup"] as const).map((comp) => {
-            const rows = standings(results, comp, week, season, teamNames);
+            const rows = positions(
+              standings(results, comp, week, season, teamNames),
+            );
             return (
               <section className="poster-league" key={comp}>
                 <div className="poster-league-title">
@@ -63,6 +64,7 @@ export default function WeeklyPoster({
                 <table>
                   <thead>
                     <tr>
+                      <th className="poster-pos">Pos</th>
                       <th>Team</th>
                       <th>P</th>
                       <th>W</th>
@@ -95,6 +97,9 @@ export default function WeeklyPoster({
                             : ""
                         }
                       >
+                        <td className="poster-pos">
+                          {r.played ? r.label : "–"}
+                        </td>
                         <td>{r.team}</td>
                         <td>{r.played}</td>
                         <td>{r.won}</td>
@@ -140,14 +145,14 @@ export default function WeeklyPoster({
                 <small>{trophy} · Top five players</small>
               </h2>
               <table>
-                <thead><tr>{key === "checkout" && <th>Pos</th>}<th>Player</th><th>Team</th><th>{key === "score" ? "Score" : key === "checkout" ? "Checkout" : "Total"}</th></tr></thead>
+                <thead><tr><th>Pos</th><th>Player</th><th>Team</th><th>{key === "score" ? "Score" : key === "checkout" ? "Checkout" : "Total"}</th></tr></thead>
                 <tbody>
                   {rankedStats(stats, key, 5).map((p) => (
                     <tr key={p.id}>
-                      {key === "checkout" && <td>
+                      <td>
                         {p.joint ? "=" : ""}
                         {p.rank}
-                      </td>}
+                      </td>
                       <td>
                         {p.name}
                       </td>
@@ -169,9 +174,9 @@ export default function WeeklyPoster({
           ? `INCOMPLETE: ${incomplete} scheduled matches still need approved results.`
           : "All entered fixtures through this date have approved results."}
         <br />P played · W won · D drawn · L lost · LF/LA legs for/against · Pts
-        points. C&V captains & vice. — category breakdown not recorded.
+        points. C&V captains & vice.
         <br />
-        Equal points remain tied. Joint player positions use =. Five players per
+        = means level. No tie-break is applied. Five players per
         list; equal values ordered by name. Full statistics remain in the
         committee dashboard.
       </footer>

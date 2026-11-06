@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createRef, type FormEvent, useEffect, useRef, useState } from "react";
 import {
   Home,
   CalendarDays,
@@ -10,6 +10,7 @@ import {
   Trophy,
   Image as ImageIcon,
   Download,
+  Share2,
   LogOut,
   ArrowUpRight,
   ShieldCheck,
@@ -18,15 +19,34 @@ import {
 } from "lucide-react";
 import {
   playerStatistics,
+  type CupFormat,
   rankedStats,
   type PlayerStat,
 } from "@/lib/player-statistics";
-import { toPng } from "html-to-image";
 import { normalise } from "@/lib/player-csv";
 import PlayerCsvImport from "@/components/player-csv-import";
 import MatchSummary from "@/components/match-summary";
 import PosterPreview from "@/components/poster-preview";
-import WeeklyPoster from "@/components/weekly-poster";
+import {
+  AllInOneImage,
+  CupAwardsImage,
+  LeagueImage,
+  ResultsSoFarImage,
+  ROUNDS_PER_PAGE,
+} from "@/components/share-images";
+import WeeklyResults from "@/components/weekly-results";
+import {
+  download,
+  renderPng,
+  shareManyOrDownload,
+  shareOrDownload,
+} from "@/lib/share-image";
+import {
+  byeTeams,
+  latestRound,
+  weeklyMatches,
+  weeklyRounds,
+} from "@/lib/weekly-results";
 import SheetScanner from "@/components/sheet-scanner";
 import SummaryEntry from "@/components/summary-entry";
 import {
@@ -40,7 +60,7 @@ import ManualGameEntry from "@/components/manual-game-entry";
 import { gameComplete } from "@/lib/manual-entry";
 import { supabase } from "@/lib/supabase";
 import { demoFixtures, demoResults, demoPlayers } from "@/lib/demo";
-import { gameTypes, standings, type Result } from "@/lib/standings";
+import { gameTypes, positions, standings, type Result } from "@/lib/standings";
 const client = supabase();
 const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 type Screen =
@@ -65,6 +85,7 @@ type Fixture = {
   away_team_id?: string;
 };
 type Option = { id: string; name: string; team_id?: string };
+type SeasonOption = Option & { cup_format?: CupFormat };
 type PlayerEntry = {
   player_id: string;
   side: "home" | "away";
@@ -134,7 +155,9 @@ function Table({
   cutoff: string;
   season: string;
 }) {
-  const rows = standings(results, competition, cutoff, season, teamNames);
+  const rows = positions(
+    standings(results, competition, cutoff, season, teamNames),
+  );
   const kinds = ["Pairs", "Trebles", "Singles", "Captains & vice"];
   const totals = kinds.map(
     (kind) =>
@@ -151,7 +174,9 @@ function Table({
         <table>
           <thead>
             <tr>
+              <th className="pos">Pos</th>
               <th>Team</th>
+              <th>Pts</th>
               <th>Played</th>
               {full && (
                 <>
@@ -169,15 +194,16 @@ function Table({
                   <th>Legs against</th>
                 </>
               )}
-              {!breakdown && competition === "league" && <th>Lost</th>}
+              {!breakdown && competition === "league" && <th>Games lost</th>}
               {breakdown && kinds.map((kind) => <th key={kind}>{kind}</th>)}
-              <th>Total points</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.team}>
+                <td className="pos">{r.played ? r.label : "–"}</td>
                 <td style={{ fontWeight: 600 }}>{r.team}</td>
+                <td className="pts">{r.points}</td>
                 <td>{r.played}</td>
                 {full && (
                   <>
@@ -202,9 +228,6 @@ function Table({
                   kinds.map((kind, i) => (
                     <td key={kind}>{totals[i].get(r.team) ?? "—"}</td>
                   ))}
-                <td style={{ color: "var(--pink)", fontWeight: 700 }}>
-                  {r.points}
-                </td>
               </tr>
             ))}
           </tbody>
@@ -217,8 +240,8 @@ function Table({
       )}
       <p className="muted" style={{ fontSize: 11 }}>
         {competition === "league"
-          ? "Most points first · Equal points are tied · "
-          : "Most points first · Equal points are tied · "}{" "}
+          ? "Most points first · Teams level on points share a position · "
+          : "Most points first · Teams level on points share a position · "}{" "}
         {competition === "league"
           ? "Points = Pairs + Trebles + Singles + Captains & vice."
           : "Cup: win 2 points · draw 1 · loss 0."}
@@ -237,7 +260,7 @@ export default function Workspace() {
   const [saveError, setSaveError] = useState("");
   const [results, setResults] = useState<Result[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [seasons, setSeasons] = useState<Option[]>([]);
+  const [seasons, setSeasons] = useState<SeasonOption[]>([]);
   const [teams, setTeams] = useState<Option[]>([]);
   const [players, setPlayers] = useState<Option[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
@@ -266,10 +289,16 @@ export default function Workspace() {
   const [review, setReview] = useState(false);
   const [archivePreview, setArchivePreview] = useState("");
   const [history, setHistory] = useState<string[]>([]);
-  const [posterPart, setPosterPart] = useState<"all" | "tables" | "players">(
-    "all",
+  const [imageLayout, setImageLayout] = useState<"one" | "three" | "sofar">(
+    "one",
   );
-  const weeklyRef = useRef<HTMLDivElement>(null);
+  const soFarRefs = useRef(
+    Array.from({ length: 6 }, () => createRef<HTMLDivElement>()),
+  ).current;
+  const allRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const leagueRef = useRef<HTMLDivElement>(null);
+  const cupRef = useRef<HTMLDivElement>(null);
   const nav: { name: Screen; icon: typeof Home }[] = [
     { name: "Home", icon: Home },
     { name: "Fixtures", icon: CalendarDays },
@@ -308,7 +337,16 @@ export default function Workspace() {
     const capability = await client.from("results").select("summary").limit(0);
     if (request !== loadSequence.current) return;
     setSummaryReady(!capability.error);
-    const ss = responses[0].data ?? [];
+    // The Cup format column arrives with a database update. Until it is
+    // applied, every season is treated as a round robin Cup.
+    const formats = await client.from("seasons").select("id,cup_format");
+    if (request !== loadSequence.current) return;
+    const ss: SeasonOption[] = (responses[0].data ?? []).map((s) => ({
+      ...s,
+      cup_format: formats.error
+        ? undefined
+        : formats.data?.find((f) => f.id === s.id)?.cup_format,
+    }));
     const ts = responses[1].data ?? [];
     const ps = responses[2].data ?? [];
     setSeasons(ss);
@@ -338,7 +376,12 @@ export default function Workspace() {
         summary: r.summary,
         achievements: Object.values(
           r.games
-            .flatMap((g: { game_players: PlayerEntry[] }) => g.game_players)
+            .flatMap((g: { kind: string; game_players: PlayerEntry[] }) =>
+              // Rule 16: Captains & Vice finishes never count as Double 1s.
+              g.kind === "Captains & vice"
+                ? g.game_players.map((p) => ({ ...p, double_ones: 0 }))
+                : g.game_players,
+            )
             .reduce((acc: Record<string, PlayerEntry>, p: PlayerEntry) => {
               const old = acc[p.player_id];
               acc[p.player_id] = {
@@ -387,7 +430,16 @@ export default function Workspace() {
     });
     setResults(mappedResults);
     setSheets((responses[5].data ?? []).filter((s) => !s.removed_at));
-    setStats(playerStatistics(mappedResults, ps, ts, season, week));
+    setStats(
+      playerStatistics(
+        mappedResults,
+        ps,
+        ts,
+        season,
+        week,
+        ss.find((s) => s.name === season)?.cup_format ?? "round_robin",
+      ),
+    );
     setLoadedScope([season, competition, week].join(":"));
   }
   useEffect(() => {
@@ -807,6 +859,27 @@ export default function Workspace() {
     );
   }
   const scoped = results.filter((r) => r.season === season && r.approved);
+  const rounds = weeklyRounds(
+    fixtures.filter((f) => demo || f.season === season),
+    season,
+  );
+  const shownRound = latestRound(rounds, week);
+  const roundMatches = shownRound
+    ? weeklyMatches(
+        fixtures.filter((f) => demo || f.season === season),
+        results,
+        shownRound.date,
+        season,
+      )
+    : [];
+  const roundBye = shownRound
+    ? byeTeams(
+        fixtures.filter((f) => demo || f.season === season),
+        shownRound.date,
+        season,
+        seasonTeamNames,
+      )
+    : [];
   const incomplete = fixtures.filter(
     (f) =>
       (demo || f.season === season) &&
@@ -838,7 +911,7 @@ export default function Workspace() {
     return (
       <main className="login">
         <div className="brand-mark">
-          <Target size={28} />
+          <img src="/ccldl-crest.png" alt="" />
         </div>
         <h1>Welcome to CCLDL</h1>
         <p className="muted">Chelmsford City Ladies Darts League</p>
@@ -872,7 +945,9 @@ export default function Workspace() {
                 {busy ? "Signing in…" : "Secure sign in"}
                 <ShieldCheck size={17} />
               </button>
-              <p><a href="/forgot-password">Forgot password?</a></p>
+              <p>
+                <a href="/forgot-password">Forgot password?</a>
+              </p>
             </form>
           ) : (
             <div className="notice">
@@ -908,7 +983,8 @@ export default function Workspace() {
           <div className="result-row" key={s.id}>
             <span>
               <strong>
-                {key === "checkout" && `${s.joint ? "=" : ""}${s.rank}. `}{s.name}
+                {key === "checkout" && `${s.rank}. `}
+                {s.name}
               </strong>
               {s.team && <small className="player-team">{s.team}</small>}
             </span>
@@ -932,7 +1008,7 @@ export default function Workspace() {
           }}
         >
           <div className="brand-mark">
-            <Target />
+            <img src="/ccldl-crest.png" alt="" />
           </div>
           <span className="brand">CCLDL</span>
         </div>
@@ -1019,7 +1095,7 @@ export default function Workspace() {
                 ))}
               </select>
             </label>
-            {["Tables", "Results", "Weekly Overview"].includes(screen) && (
+            {["Tables", "Results"].includes(screen) && (
               <label>
                 Competition
                 <select
@@ -1226,8 +1302,8 @@ export default function Workspace() {
             )}
             <h2>Player statistics</h2>
             <p className="muted">
-              Cumulative season totals · League and Cup combined · through{" "}
-              {dateLabel(week)}
+              Season totals through {dateLabel(week)} · League and Cup combined
+              · Double 1s leave out the Captains &amp; Vice game
             </p>
             <div className="filter-pills" aria-label="Player statistic">
               {(
@@ -1982,77 +2058,315 @@ export default function Workspace() {
         )}
         {screen === "Weekly Overview" && (
           <>
-            <div className="card">
-              <div className="fields">
-                <label>
-                  Include results through
-                  <input
-                    type="date"
-                    value={week}
-                    onChange={(e) => setWeek(e.target.value)}
+            {(() => {
+              const tag = shownRound?.date ?? week;
+              const suffix = demo ? "-DEMO" : "";
+              const roundText = shownRound
+                ? shownRound.number
+                  ? `after ${shownRound.label} · ${dateLabel(shownRound.date)}`
+                  : `up to ${dateLabel(shownRound.date)}`
+                : `up to ${dateLabel(week)}`;
+              const set = [
+                {
+                  key: "results",
+                  title: "1. This week's results",
+                  ref: resultsRef,
+                  file: `CCLDL-1-results-${tag}${suffix}.png`,
+                  ready: Boolean(shownRound),
+                },
+                {
+                  key: "league",
+                  title: "2. League table",
+                  ref: leagueRef,
+                  file: `CCLDL-2-league-${tag}${suffix}.png`,
+                  ready: true,
+                },
+                {
+                  key: "cup",
+                  title: "3. Cup & player awards",
+                  ref: cupRef,
+                  file: `CCLDL-3-cup-awards-${tag}${suffix}.png`,
+                  ready: statsReady,
+                },
+              ];
+              const soFar = rounds
+                .filter((r) => r.date <= week)
+                .map((r) => ({
+                  date: r.date,
+                  label: r.label,
+                  matches: weeklyMatches(
+                    fixtures.filter((f) => demo || f.season === season),
+                    results,
+                    r.date,
+                    season,
+                  ),
+                }));
+              const soFarPages = Array.from(
+                {
+                  length: Math.min(
+                    soFarRefs.length,
+                    Math.max(1, Math.ceil(soFar.length / ROUNDS_PER_PAGE)),
+                  ),
+                },
+                (_, i) =>
+                  soFar.slice(i * ROUNDS_PER_PAGE, (i + 1) * ROUNDS_PER_PAGE),
+              );
+              const images =
+                imageLayout === "sofar"
+                  ? soFarPages.map((_, i) => ({
+                      key: `sofar-${i}`,
+                      title:
+                        soFarPages.length > 1
+                          ? `Results so far (${i + 1} of ${soFarPages.length})`
+                          : "Results so far",
+                      ref: soFarRefs[i],
+                      file: `CCLDL-results-so-far-${tag}${soFarPages.length > 1 ? `-${i + 1}` : ""}${suffix}.png`,
+                      ready: true,
+                    }))
+                  : imageLayout === "one"
+                    ? [
+                        {
+                          key: "all",
+                          title: "Weekly standings",
+                          ref: allRef,
+                          file: `CCLDL-weekly-${tag}${suffix}.png`,
+                          ready: statsReady,
+                        },
+                      ]
+                    : set;
+              const caption = `Chelmsford City Ladies Darts League · ${shownRound?.label ?? season}`;
+              const note = (outcome: string) => {
+                if (outcome === "downloaded")
+                  setMessage(
+                    "Sharing isn't available on this device, so the images have been downloaded. Attach them to your WhatsApp or Facebook post.",
+                  );
+              };
+              const run = async (job: () => Promise<void>) => {
+                setBusy(true);
+                try {
+                  await job();
+                } catch {
+                  setMessage(
+                    "The image couldn't be created. Please try again.",
+                  );
+                } finally {
+                  setBusy(false);
+                }
+              };
+              const allReady = images.every((i) => i.ready) && !busy;
+              const preview = (key: string) =>
+                key.startsWith("sofar-") ? (
+                  <ResultsSoFarImage
+                    season={season}
+                    week={week}
+                    rounds={soFarPages[Number(key.slice(6))]}
+                    page={Number(key.slice(6)) + 1}
+                    pages={soFarPages.length}
+                    demo={demo}
                   />
-                </label>
-                <label>
-                  Image content
-                  <select
-                    value={posterPart}
-                    onChange={(e) =>
-                      setPosterPart(e.target.value as typeof posterPart)
-                    }
-                  >
-                    <option value="all">Everything · one PNG</option>
-                    <option value="tables">Tables only · image 1 of 2</option>
-                    <option value="players">
-                      Player leaders · image 2 of 2
-                    </option>
-                  </select>
-                </label>
-                <div style={{ alignSelf: "end" }}>
-                  <button
-                    className="primary"
-                    onClick={async () => {
-                      if (!weeklyRef.current) return;
-                      setBusy(true);
-                      try {
-                        const url = await toPng(weeklyRef.current, {
-                          pixelRatio: 2,
-                          backgroundColor: "#ffffff",
-                        });
-                        const a = document.createElement("a");
-                        a.download = `CCLDL-${week}-${posterPart}${demo ? "-DEMO" : ""}.png`;
-                        a.href = url;
-                        a.click();
-                      } catch {
-                        setMessage("PNG generation failed. Please try again.");
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                    disabled={busy || !statsReady || !week}
-                  >
-                    <Download size={16} /> Download PNG
-                  </button>
-                </div>
-              </div>
-              <p className="muted">
-                Download the image and attach it to your Facebook group post.
-                The image keeps the same readable layout on every phone.
-                Previous dates use the latest corrected results.
-              </p>
-            </div>
-            <PosterPreview posterRef={weeklyRef}>
-              <WeeklyPoster
-                part={posterPart}
-                teamNames={seasonTeamNames}
-                results={results}
-                stats={stats}
-                season={season}
-                week={week}
-                competition={competition}
-                incomplete={incomplete.length}
-                demo={demo}
-              />
-            </PosterPreview>
+                ) : key === "results" ? (
+                  shownRound ? (
+                    <WeeklyResults
+                      season={season}
+                      date={shownRound.date}
+                      label={shownRound.label}
+                      matches={roundMatches}
+                      bye={roundBye}
+                      demo={demo}
+                    />
+                  ) : (
+                    <p className="si-empty">
+                      No fixtures have been played yet this season.
+                    </p>
+                  )
+                ) : key === "all" ? (
+                  <AllInOneImage
+                    results={results}
+                    stats={stats}
+                    season={season}
+                    week={week}
+                    teamNames={seasonTeamNames}
+                    matches={roundMatches}
+                    roundLabel={shownRound?.label ?? "No fixtures yet"}
+                    roundDate={shownRound?.date ?? week}
+                    demo={demo}
+                  />
+                ) : key === "league" ? (
+                  <LeagueImage
+                    results={results}
+                    season={season}
+                    week={week}
+                    teamNames={seasonTeamNames}
+                    roundText={roundText}
+                    demo={demo}
+                  />
+                ) : (
+                  <CupAwardsImage
+                    results={results}
+                    stats={stats}
+                    season={season}
+                    week={week}
+                    teamNames={seasonTeamNames}
+                    roundText={roundText}
+                    demo={demo}
+                  />
+                );
+              return (
+                <>
+                  <div className="card">
+                    <div className="fields">
+                      <label>
+                        Week
+                        <select
+                          value={shownRound?.date ?? ""}
+                          onChange={(e) => setWeek(e.target.value)}
+                          disabled={!rounds.length}
+                        >
+                          {!rounds.length && (
+                            <option value="">No fixtures yet</option>
+                          )}
+                          {[...rounds].reverse().map((r) => (
+                            <option key={r.date} value={r.date}>
+                              {r.label} · {dateLabel(r.date)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="si-layout" aria-label="Image layout">
+                        <button
+                          className={
+                            imageLayout === "one" ? "primary" : "secondary"
+                          }
+                          aria-pressed={imageLayout === "one"}
+                          onClick={() => setImageLayout("one")}
+                        >
+                          One image
+                        </button>
+                        <button
+                          className={
+                            imageLayout === "three" ? "primary" : "secondary"
+                          }
+                          aria-pressed={imageLayout === "three"}
+                          onClick={() => setImageLayout("three")}
+                        >
+                          Three images
+                        </button>
+                        <button
+                          className={
+                            imageLayout === "sofar" ? "primary" : "secondary"
+                          }
+                          aria-pressed={imageLayout === "sofar"}
+                          onClick={() => setImageLayout("sofar")}
+                        >
+                          Results so far
+                        </button>
+                      </div>
+                    </div>
+                    <div className="fields">
+                      <div className="share-actions">
+                        <button
+                          className="primary"
+                          disabled={!allReady}
+                          onClick={() =>
+                            run(async () =>
+                              note(
+                                await shareManyOrDownload(
+                                  images.map((i) => ({
+                                    node: i.ref.current!,
+                                    filename: i.file,
+                                  })),
+                                  caption,
+                                ),
+                              ),
+                            )
+                          }
+                        >
+                          <Share2 size={16} />{" "}
+                          {images.length > 1
+                            ? `Share all ${images.length}`
+                            : "Share"}
+                        </button>
+                        <button
+                          className="secondary"
+                          disabled={!allReady}
+                          onClick={() =>
+                            run(async () => {
+                              for (const i of images) {
+                                const { url } = await renderPng(
+                                  i.ref.current!,
+                                  i.file,
+                                );
+                                download(url, i.file);
+                              }
+                            })
+                          }
+                        >
+                          <Download size={16} />{" "}
+                          {images.length > 1 ? "Download all" : "Download"}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="muted">
+                      On a phone, Share opens your share menu so you can send
+                      the images straight to WhatsApp or Facebook. Only approved
+                      results appear. Earlier weeks use the latest corrected
+                      results.
+                    </p>
+                  </div>
+                  <div className="si-set">
+                    {images.map((i) => (
+                      <section className="card si-set-item" key={i.key}>
+                        <h2>{i.title}</h2>
+                        <PosterPreview
+                          key={i.key}
+                          posterRef={i.ref}
+                          width={1080}
+                          className="si-frame"
+                        >
+                          {preview(i.key)}
+                        </PosterPreview>
+                        {images.length > 1 && (
+                          <div className="actions">
+                            <button
+                              className="primary"
+                              disabled={!i.ready || busy}
+                              onClick={() =>
+                                run(async () =>
+                                  note(
+                                    await shareOrDownload(
+                                      i.ref.current!,
+                                      i.file,
+                                      caption,
+                                    ),
+                                  ),
+                                )
+                              }
+                            >
+                              <Share2 size={16} /> Share
+                            </button>
+                            <button
+                              className="secondary"
+                              disabled={!i.ready || busy}
+                              onClick={() =>
+                                run(async () => {
+                                  const { url } = await renderPng(
+                                    i.ref.current!,
+                                    i.file,
+                                  );
+                                  download(url, i.file);
+                                })
+                              }
+                            >
+                              <Download size={16} /> Download
+                            </button>
+                          </div>
+                        )}
+                      </section>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
           </>
         )}
         {screen === "More" && (
@@ -2168,11 +2482,27 @@ function SetupForms({
   clientReady: boolean;
   players: Option[];
   teams: Option[];
-  seasons: Option[];
+  seasons: SeasonOption[];
   reload: () => Promise<void>;
   notify: (s: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const formatReady = seasons.some((s) => s.cup_format);
+  async function changeCupFormat(season: SeasonOption, cup_format: string) {
+    if (!client || !clientReady || busy) return;
+    setBusy(true);
+    const r = await client
+      .from("seasons")
+      .update({ cup_format })
+      .eq("id", season.id);
+    setBusy(false);
+    notify(
+      r.error
+        ? r.error.message
+        : `${season.name} Cup set to ${cup_format === "knockout" ? "knockout" : "round robin"}. Double 1s totals have been recalculated.`,
+    );
+    if (!r.error) await reload();
+  }
   const [rosterSearch, setRosterSearch] = useState("");
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState("");
@@ -2453,6 +2783,31 @@ function SetupForms({
           Save fixture
         </button>
       </form>
+      {formatReady && (
+        <section aria-label="Cup format">
+          <h3>Cup format</h3>
+          <p className="muted">
+            Cup Double 1s count towards the Pitt Stop Madhouse Trophy only when
+            the Cup is a round robin. In a knockout season only League Double 1s
+            count.
+          </p>
+          <div className="fields">
+            {seasons.map((s) => (
+              <label key={s.id}>
+                {s.name}
+                <select
+                  value={s.cup_format ?? "round_robin"}
+                  disabled={!clientReady || busy}
+                  onChange={(e) => changeCupFormat(s, e.target.value)}
+                >
+                  <option value="round_robin">Round robin</option>
+                  <option value="knockout">Knockout</option>
+                </select>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
       <form onSubmit={(e) => submit(e, "seasons")}>
         <h3>Add a season</h3>
         <div className="fields">
@@ -2468,6 +2823,15 @@ function SetupForms({
             Ends on
             <input type="date" name="ends_on" required />
           </label>
+          {formatReady && (
+            <label>
+              Cup format
+              <select name="cup_format" defaultValue="round_robin">
+                <option value="round_robin">Round robin</option>
+                <option value="knockout">Knockout</option>
+              </select>
+            </label>
+          )}
         </div>
         <button
           className="secondary"

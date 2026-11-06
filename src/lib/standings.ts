@@ -93,3 +93,25 @@ export function gameTypes(competition: "league" | "cup") {
         ...Array<string>(6).fill("Singles"),
       ];
 }
+
+/**
+ * Table positions. Teams that have played come first, in points order; teams
+ * level on points share a position number (1, 2, 2, 4). Teams yet to play
+ * keep their place at the bottom without a position. No tie-break is applied
+ * until the committee confirms one.
+ */
+export function positions<T extends { points: number; played?: number }>(
+  rows: T[],
+) {
+  const played = rows.filter((r) => r.played === undefined || r.played > 0);
+  const waiting = rows.filter((r) => r.played !== undefined && r.played === 0);
+  return [...played, ...waiting].map((r) => {
+    const ranked = r.played === undefined || r.played > 0;
+    const rank = ranked
+      ? played.findIndex((x) => x.points === r.points) + 1
+      : 0;
+    const joint =
+      ranked && played.filter((x) => x.points === r.points).length > 1;
+    return { ...r, rank, joint, label: ranked ? String(rank) : "–" };
+  });
+}

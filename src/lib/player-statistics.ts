@@ -7,12 +7,16 @@ export type PlayerStat = {
   score: number;
   checkout: number;
 };
+/** How the season's Cup is played, set per season in Season administration. */
+export type CupFormat = "round_robin" | "knockout";
+
 export function playerStatistics(
   results: Result[],
   players: { id: string; name: string; team_id?: string }[],
   teams: { id: string; name: string }[],
   season: string,
   cutoff: string,
+  cupFormat: CupFormat = "round_robin",
 ): PlayerStat[] {
   const totals = new Map<string, PlayerStat>();
   for (const r of new Map(
@@ -29,7 +33,12 @@ export function playerStatistics(
         score: 0,
         checkout: 0,
       };
-      row.d1 += p.double_ones;
+      // Cup Double 1s count only in a round robin Cup, where every team plays
+      // the same number of Cup games. In a knockout Cup only League Double 1s
+      // count. (Captains & Vice finishes are left out when results are
+      // entered, per Rule 16.)
+      if (r.competition !== "cup" || cupFormat === "round_robin")
+        row.d1 += p.double_ones;
       row.score = Math.max(
         row.score,
         p.highest_score ?? 0,
@@ -58,11 +67,9 @@ export function rankedStats(
         a.name.localeCompare(b.name) ||
         a.id.localeCompare(b.id),
     );
-  return sorted
-    .slice(0, limit)
-    .map((s, i) => ({
-      ...s,
-      rank: sorted.findIndex((x) => x[key] === s[key]) + 1,
-      joint: sorted.filter((x) => x[key] === s[key]).length > 1,
-    }));
+  return sorted.slice(0, limit).map((s, i) => ({
+    ...s,
+    rank: sorted.findIndex((x) => x[key] === s[key]) + 1,
+    joint: sorted.filter((x) => x[key] === s[key]).length > 1,
+  }));
 }

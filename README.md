@@ -229,3 +229,51 @@ Production setup in **Supabase → Authentication → URL Configuration**:
 - Verify email delivery for both committee accounts. If Supabase's default email provider restricts recipients, configure a production SMTP provider under Authentication email settings. App tests mock email delivery; they do not prove real inbox delivery.
 
 No database migration is required. Account creation and committee membership remain administrator-controlled.
+
+### Weekly results image, sharing and crest (November 2026)
+
+Weekly Overview now opens on **This week's results**: one image per round with
+every match score, the four League section scores (Pairs, Trebles, Captains &
+Vice, Singles) with the winning side in pink, the bye team and a note for any
+result not yet approved. Drafts never appear. Rounds are named from the saved
+fixtures ("League 4", "Cup 2"); a date with fewer than three fixtures of a
+competition is shown as catch-up matches. The image is 1080px wide (2160px
+exported) so it reads well on a phone.
+
+**Share** renders the selected image and opens the phone's share menu, so it
+can go straight to WhatsApp or Facebook. Browsers that cannot share files
+(most desktop browsers) download the image instead and say so. **Download**
+always saves the PNG. Nothing is posted automatically.
+
+The pink CCLDL crest (`public/ccldl-crest.png`) replaces the target icon in the
+sign-in screen, sidebar, standings poster and results image. The home-screen
+icons (`icon-192.png`, `icon-512.png`) use the crest on a light pink square.
+Phones that installed the app earlier may keep the old icon until it is
+removed and added to the home screen again.
+
+Calculation logic: `src/lib/weekly-results.ts`; tests: `tests/weekly-results.test.ts`.
+
+**Double 1s (Pitt Stop trophy).** Only finishes from 2 left count, and never
+in the Captains & Vice game (Rule 16). Cup Double 1s count only when that
+season's Cup is a round robin, where every team plays the same number of
+games; in a knockout season only League Double 1s count (committee decision,
+November 2026). Each season's Cup format is set under Season administration
+and defaults to round robin. It needs the migration
+`supabase/migrations/202611060001_cup_format.sql`; until that is applied,
+every season is treated as round robin and the setting stays hidden. Detailed game-by-game results skip the
+Captains & Vice game automatically; for category-total results the committee
+enters only qualifying finishes, as the entry form reminds them. Totals are
+recalculated from saved results.
+
+### Weekly share images (three-image set)
+
+Weekly Overview now builds three matching images for each round, each 1080 x
+1350 (Facebook's portrait size, exported at 2x): **1. This week's results**,
+**2. League table** (with Pairs, Trebles, C&V and Singles) and **3. Cup &
+player awards**. Pick the week once; all three follow it. Each image has its
+own Share and Download buttons, and **Share all 3** sends the set in one go
+(on phones that support sharing several files; otherwise all three download).
+Styles live in `src/app/share-images.css`; the images are built by
+`src/components/weekly-results.tsx` and `src/components/share-images.tsx`.
+Positions no longer use "=": teams level on points share the same number, and
+teams yet to play sit at the bottom without a position.

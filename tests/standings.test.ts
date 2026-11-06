@@ -65,3 +65,31 @@ test("Cup 2/1/0 recalculates historical wins draws losses and corrections; all t
   assert.equal(rows.find((r) => r.team === "A")?.points, 0);
   assert.equal(standings([result], "league", "2026-10-10")[0].points, 7);
 });
+
+test("positions share a place when points are level", async () => {
+  const { positions } = await import("../src/lib/standings");
+  const labels = positions([
+    { points: 28 },
+    { points: 24 },
+    { points: 24 },
+    { points: 19 },
+  ]).map((r) => r.label);
+  assert.deepEqual(labels, ["1", "2", "2", "4"]);
+});
+
+test("teams yet to play sit below teams that have played", async () => {
+  const { positions } = await import("../src/lib/standings");
+  const rows = positions([
+    { team: "A", points: 2, played: 1 },
+    { team: "B", points: 0, played: 0 },
+    { team: "C", points: 0, played: 1 },
+  ]);
+  assert.deepEqual(
+    rows.map((r) => [r.team, r.label]),
+    [
+      ["A", "1"],
+      ["C", "2"],
+      ["B", "–"],
+    ],
+  );
+});

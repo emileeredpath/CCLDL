@@ -1316,3 +1316,45 @@ td {
 .poster-block td:last-child { width:auto; font-size:27px; text-align:center; }
 .poster-block .poster-player-team { font-size:20px; font-weight:400; }
 .weekly-poster footer { font-size:16px; line-height:1.4; padding:12px 6px 0; }
+
+.share-actions { display: flex; flex-wrap: wrap; gap: 10px; align-self: end; }
+.poster-emblem-img { width: 124px; height: 124px; object-fit: contain; }
+.weekly-poster .poster-header { grid-template-columns: 130px minmax(0, 1fr) 130px; }
+.brand-mark img { width: 48px; height: 48px; }
+.brand-mark:has(img) { background: none; border-radius: 0; }
+.login .brand-mark, .login .brand-mark img { width: 104px; height: 104px; }
+.login .brand-mark { margin: 0 auto 8px; }
+
+/* Contrast: pink text on pale pink fills reaches 4.5:1+, control borders 3:1+. */
+:root { --pink-text: #ad3a62; --input-border: #9e8592; }
+.nav-item.active, .secondary, .score, .tab-group button:not(.selected), .avatar,
+.manual-player summary, .scanner-disclosure > summary, .match-score {
+  color: var(--pink-text);
+}
+input, select, textarea, .ocr-text { border-color: var(--input-border); }
+input[type="file"] { border-color: var(--input-border); }
+.pos { color: var(--muted); font-weight: 700; width: 44px; }
+.pts { color: var(--pink-text); font-weight: 800; }
+@media (max-width: 640px) {
+  .table-wrap:has(th.pos) th.pos, .table-wrap:has(th.pos) td.pos {
+    min-width: 40px; max-width: 40px; width: 40px;
+  }
+  .table-wrap:has(th.pos) tr > :nth-child(2) {
+    position: sticky; left: 40px; background: white; z-index: 1;
+    min-width: 112px; max-width: 145px; white-space: normal;
+  }
+}
+.weekly-poster .poster-pos { width: 56px; text-align: center; font-weight: 800; color: #7e103d; }
+.weekly-poster td:first-child.poster-pos { width: 56px; }
+.poster-main-tables .poster-league td.poster-pos,
+.poster-main-tables .poster-league th.poster-pos { width: 56px; font-weight: 800; text-align: center; }
+.poster-main-tables .poster-league td:nth-child(2) { font-weight: 700; width: 27%; white-space: normal; }
+.poster-block th:first-child, .poster-block td:first-child { width: 56px; text-align: center; font-weight: 800; color: #7e103d; }
+@media (max-width: 640px) {
+  .table-wrap:has(th.pos) th.pos, .table-wrap:has(th.pos) td.pos {
+    position: sticky; left: 0; background: white; z-index: 1;
+  }
+  .table-wrap:has(th.pos) th.pos, .table-wrap:has(th.pos) th:nth-child(2) { background: #fcf8fa; }
+}
+.poster-main-tables .poster-league th:nth-child(2),
+.poster-main-tables .poster-league td:nth-child(2) { text-align: left; }
