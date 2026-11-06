@@ -1282,8 +1282,8 @@ export default function Workspace() {
             )}
             <h2>Player statistics</h2>
             <p className="muted">
-              Season totals through {dateLabel(week)} · Double 1s are League
-              only (Rule 16) · Highest score and checkout include League and Cup
+              Season totals through {dateLabel(week)} · League and Cup
+              combined · Double 1s leave out the Captains &amp; Vice game
             </p>
             <div className="filter-pills" aria-label="Player statistic">
               {(

@@ -250,7 +250,7 @@ export function CupAwardsImage({
         </div>
       </div>
       <ImageFooter
-        note="Top five players · Double 1s count League finishes only (Rule 16)"
+        note="Top five players · League and Cup combined"
         season={season}
         demo={demo}
       />
@@ -457,7 +457,7 @@ export function AllInOneImage({
       <footer className="ai-foot">
         <p>
           Points are games won · Teams level on points share a position · Legs =
-          for–against · Winners in bold · Double 1s count League finishes only
+          for–against · Winners in bold · League and Cup combined
         </p>
         <p className="si-brand">
           Chelmsford City Ladies Darts League · {season}
@@ -551,9 +551,7 @@ export function ResultsSoFarImage({
         )}
       </div>
       <footer className="ai-foot">
-        <p>
-          In date order · Winners in bold · TBC = result not yet confirmed
-        </p>
+        <p>In date order · Winners in bold · TBC = result not yet confirmed</p>
         <p className="si-brand">
           Chelmsford City Ladies Darts League · {season}
           {demo ? " · FICTIONAL DEMONSTRATION" : ""}

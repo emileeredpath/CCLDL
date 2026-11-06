@@ -253,13 +253,13 @@ removed and added to the home screen again.
 
 Calculation logic: `src/lib/weekly-results.ts`; tests: `tests/weekly-results.test.ts`.
 
-**Double 1s follow Rule 16.** The Pitt Stop trophy counts only Double 1
-finishes from 2 left, and never in the Captains & Vice game or Cup games.
-Player statistics therefore add up Double 1s from League results only.
-Detailed game-by-game results skip the Captains & Vice game automatically;
-for category-total results the committee enters only qualifying finishes, as
-the entry form reminds them. Highest score and highest checkout still use
-League and Cup results. Existing records are not changed: totals are
+**Double 1s (Pitt Stop trophy).** Only finishes from 2 left count, and never
+in the Captains & Vice game (Rule 16). League and Cup Double 1s both count:
+the committee confirmed in November 2026 that Rule 16's Cup exclusion dates
+from when the Cup was a knockout, and it is now a round robin where every
+team plays the same number of games. Detailed game-by-game results skip the
+Captains & Vice game automatically; for category-total results the committee
+enters only qualifying finishes, as the entry form reminds them. Totals are
 recalculated from saved results.
 
 ### Weekly share images (three-image set)
